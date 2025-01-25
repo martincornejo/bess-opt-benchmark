@@ -201,7 +201,7 @@ def run_pool(scenarios: dict) -> dict:
 # %%
 if __name__ == "__main__":
     config = "data/simulation.local.ini"
-    profile = "data/electricity_prices_germany_2019.csv"
+    profile = "data/intraday_prices/electricity_prices_germany_2019.csv"
 
     scenarios = {}
 
