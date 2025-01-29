@@ -17,6 +17,8 @@ from optimizer import OptModel
 from linear_model import LinearStorageModel
 from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConverter
 
+from analysis import summary_results
+
 # %% [markdown]
 # ## Price timeseries
 
@@ -48,14 +50,14 @@ def simses_factory(config, soh_r=1.0):
 
 
 # %%
-def build_linear_optimizer(profile):
+def build_linear_optimizer(profile, max_fec=2.0):
     solver = opt.SolverFactory("appsi_highs")
     bess = LinearStorageModel(capacity=66e3, power=100e3, effc=0.9)
-    return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=2)  # horizon = 24 h
+    return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
 # %%
-def build_non_linear_optimizer(profile, soh_r=1.0):
+def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
     circuit = (217, 1)
     converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 30}
 
@@ -72,15 +74,15 @@ def build_non_linear_optimizer(profile, soh_r=1.0):
     )
 
     solver = opt.SolverFactory("ipopt")
-    return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=2)
+    return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=max_fec)
 
 
 # %%
-def optimizer_factory(model, profile, soh_r=1.0):
+def optimizer_factory(model, profile, soh_r=1.0, max_fec=2.0):
     if model == "NL":
-        optimizer = build_non_linear_optimizer(profile, soh_r=soh_r)
+        optimizer = build_non_linear_optimizer(profile, soh_r=soh_r, max_fec=max_fec)
     elif model == "LP":
-        optimizer = build_linear_optimizer(profile)
+        optimizer = build_linear_optimizer(profile, max_fec=max_fec)
     else:
         raise NotImplementedError(f"{model} not supported.")
     return optimizer
@@ -195,6 +197,7 @@ def run_pool(scenarios: dict) -> dict:
         tasks = [(scenario, results, position) for position, scenario in enumerate(scenarios.items())]
         pool.starmap(run_scenario, tasks)
 
+    tqdm.write("All simulations finished.")
     return dict(results)
 
 
@@ -202,19 +205,31 @@ def run_pool(scenarios: dict) -> dict:
 if __name__ == "__main__":
     config = "data/simulation.local.ini"
     profile = "data/intraday_prices/electricity_prices_germany_2019.csv"
+    price = load_price_timeseries(profile)
 
     scenarios = {}
 
-    # for model in ("LP", "NL"):
-    # for model in ("LP"):
-    model = "LP"
+    # model = "LP"
 
-    for R in (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0):
-        scenarios[f"{model} {R=}"] = {
-            "config_file": config,
-            "profile_file": profile,
-            "sim_params": {"soh_r": R},
-            "opt_params": {"model": model, "soh_r": R},
-        }
+    # for R in (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0):
+    #     scenarios[f"{model} {R=}"] = {
+    #         "config_file": config,
+    #         "profile_file": profile,
+    #         "sim_params": {"soh_r": R},
+    #         "opt_params": {"model": model, "soh_r": R},
+    #     }
+
+    R = 2.0
+    for model in ("LP", "NL"):
+        for FEC in (1.0, 1.5, 2.0, 10.0):
+            scenarios[f"{model} {FEC=}"] = {
+                "config_file": config,
+                "profile_file": profile,
+                "sim_params": {"soh_r": R},
+                "opt_params": {"model": model, "soh_r": R, "max_fec": FEC},
+            }
 
     res = run_pool(scenarios)
+    df = summary_results(res, price)
+    df.sort_values(by="name")
+    print(df)
