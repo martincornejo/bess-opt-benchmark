@@ -5,7 +5,7 @@ from pyomo.core.base.param import ScalarParam, IndexedParam
 
 
 class OptModel:
-    def __init__(self, solver, storage_model, profile, max_period_fec=2) -> None:
+    def __init__(self, solver, storage_model, profile, max_period_fec=1.0) -> None:
         self.model = opt.ConcreteModel()
         # self.solver = opt.SolverFactory("appsi_highs")
         self.solver = solver
@@ -38,9 +38,13 @@ class OptModel:
         # add period throughput constraint
         model.max_period_fec = opt.Param(within=opt.NonNegativeReals, initialize=max_period_fec, mutable=True)
 
+        @model.Expression()
+        def fec(m):
+            return sum(m.bess.powerc[t] + m.bess.powerd[t] for t in model.time) / 2 / m.bess.energy_capacity
+
         @model.Constraint()
         def throughput_constraint(m):
-            return m.bess.fec <= m.max_period_fec
+            return m.fec <= m.max_period_fec
 
         @model.Objective()
         def cost(m):

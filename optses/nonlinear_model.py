@@ -2,13 +2,15 @@ import pyomo.environ as opt
 
 
 class NonLinearStorageModel:
-    def __init__(self, battery_model, converter_model) -> None:
+    def __init__(self, battery_model, converter_model, energy_capacity: float) -> None:
+        self.energy_capacity = energy_capacity
         self.battery_model = battery_model
         self.converter_model = converter_model
 
     def build(self, block) -> None:
         self.battery_model.build(block)
         self.converter_model.build(block)
+        block.energy_capacity = opt.Param(within=opt.NonNegativeReals, initialize=self.energy_capacity, mutable=True)
 
 
 class RintModel:

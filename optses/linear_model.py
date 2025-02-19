@@ -6,8 +6,8 @@ class LinearStorageModel:
 
     def __init__(
         self,
-        capacity: float,
         power: float,
+        energy_capacity: float,
         soc_start: float = 0.5,
         soc_bounds: tuple[float, float] = (0.0, 1.0),
         effc: float = 0.9,
@@ -16,7 +16,7 @@ class LinearStorageModel:
         if effd is None:
             effd = effc
 
-        self._capacity = capacity  # Wh
+        self._energy_capacity = energy_capacity  # Wh
         self._power = power  # W
         self._soc_start = soc_start
         self._soc_bounds = soc_bounds
@@ -28,7 +28,7 @@ class LinearStorageModel:
 
         ## Params
         block.max_power = opt.Param(within=opt.NonNegativeReals, initialize=self._power, mutable=True)
-        block.capacity = opt.Param(within=opt.NonNegativeReals, initialize=self._capacity, mutable=True)
+        block.energy_capacity = opt.Param(within=opt.NonNegativeReals, initialize=self._energy_capacity, mutable=True)
         block.soc_min = opt.Param(within=opt.NonNegativeReals, initialize=self._soc_bounds[0], mutable=True)
         block.soc_max = opt.Param(within=opt.NonNegativeReals, initialize=self._soc_bounds[1], mutable=True)
         block.soc_start = opt.Param(within=opt.NonNegativeReals, initialize=self._soc_start, mutable=True)
@@ -44,16 +44,16 @@ class LinearStorageModel:
         def power(b, t):
             return b.powerc[t] - b.powerd[t]
 
-        @block.Expression()
-        def fec(b):
-            return sum(b.powerc[t] + b.powerd[t] for t in model.time) * model.dt / b.capacity / 2
+        # @block.Expression()
+        # def fec(b):
+        #     return sum(b.powerc[t] + b.powerd[t] for t in model.time) * model.dt / b.capacity / 2
 
         ## Constraints
         @block.Constraint(model.time)
         def soc_balance_constraint(b, t):
             if t == model.time.first():
-                return b.soc[t] == b.soc_start + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.capacity
-            return b.soc[t] == b.soc[t - 1] + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.capacity
+                return b.soc[t] == b.soc_start + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
+            return b.soc[t] == b.soc[t - 1] + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
 
         # @block.Constraint()
         # def soc_end_constraint(b):

@@ -50,18 +50,19 @@ def simses_factory(config, soh_r=1.0):
 
 
 # %%
-def build_linear_optimizer(profile, max_fec=2.0):
+def build_linear_optimizer(profile, max_fec=1.0):
     solver = opt.SolverFactory("appsi_highs")
-    bess = LinearStorageModel(capacity=66e3, power=100e3, effc=0.9)
+    bess = LinearStorageModel(energy_capacity=66e3, power=100e3, effc=0.95)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
 # %%
-def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
+def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=1.0):
     circuit = (217, 1)
     converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 30}
 
     nl_storage = NonLinearStorageModel(
+        energy_capacity=66e3,
         battery_model=RintModel(
             capacity=94,
             r0=0.75e-3,
@@ -78,7 +79,7 @@ def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
 
 
 # %%
-def optimizer_factory(model, profile, soh_r=1.0, max_fec=2.0):
+def optimizer_factory(model, profile, soh_r=1.0, max_fec=1.0):
     if model == "NL":
         optimizer = build_non_linear_optimizer(profile, soh_r=soh_r, max_fec=max_fec)
     elif model == "LP":
@@ -187,7 +188,7 @@ def run_scenario(scenario: dict, results: dict, position: int = 0) -> None:
 
 
 def run_pool(scenarios: dict) -> dict:
-    num_cores = os.cpu_count()
+    num_cores = 8 # os.cpu_count()
 
     manager = multiprocessing.Manager()
     results = manager.dict()  # shared dictionary to store results
@@ -204,32 +205,27 @@ def run_pool(scenarios: dict) -> dict:
 # %%
 if __name__ == "__main__":
     config = "data/simulation.local.ini"
-    profile = "data/intraday_prices/electricity_prices_germany_2019.csv"
-    price = load_price_timeseries(profile)
-
+  
+    year = 2019
+    FEC = 1.0
     scenarios = {}
-
-    # model = "LP"
-
-    # for R in (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0):
-    #     scenarios[f"{model} {R=}"] = {
-    #         "config_file": config,
-    #         "profile_file": profile,
-    #         "sim_params": {"soh_r": R},
-    #         "opt_params": {"model": model, "soh_r": R},
-    #     }
-
-    R = 2.0
-    for model in ("LP", "NL"):
-        for FEC in (1.0, 1.5, 2.0, 10.0):
-            scenarios[f"{model} {FEC=}"] = {
+    for model in ("LP","NL",):
+        for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
+            scenarios[f"{year} {model} {R=} {FEC=}"] = {
                 "config_file": config,
-                "profile_file": profile,
+                "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                 "sim_params": {"soh_r": R},
                 "opt_params": {"model": model, "soh_r": R, "max_fec": FEC},
             }
 
     res = run_pool(scenarios)
+    
+    profile = f"data/intraday_prices/electricity_prices_germany_{year}.csv"
+    price = load_price_timeseries(profile)
+
     df = summary_results(res, price)
     df.sort_values(by="name")
-    print(df)
+    df.to_csv("results/results.csv")
+    for name, df in res.items():
+        df.index.name = "time"
+        df.to_csv(f"results/{name}.csv")
