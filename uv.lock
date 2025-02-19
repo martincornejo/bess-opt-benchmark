@@ -1526,7 +1526,7 @@ wheels = [
 [[package]]
 name = "simses"
 version = "1.3.8"
-source = { git = "https://gitlab.lrz.de/open-ees-ses/simses.git?rev=bess-eff-opt#28405bc2eedbd37f35dc678d46f1bf13edd88685" }
+source = { git = "https://gitlab.lrz.de/open-ees-ses/simses.git?rev=bess-eff-opt#75832ccfd79eced1f9f45a5caf0810b0b3a938a7" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
