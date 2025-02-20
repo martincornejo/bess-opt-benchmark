@@ -52,17 +52,17 @@ def simses_factory(config, soh_r=1.0):
 # %%
 def build_linear_optimizer(profile, max_fec=1.0):
     solver = opt.SolverFactory("appsi_highs")
-    bess = LinearStorageModel(energy_capacity=66e3, power=100e3, effc=0.95)
+    bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=0.95)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
 # %%
 def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=1.0):
-    circuit = (217, 1)
+    circuit = (260, 2)
     converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 30}
 
     nl_storage = NonLinearStorageModel(
-        energy_capacity=66e3,
+        energy_capacity=180e3,
         battery_model=RintModel(
             capacity=94,
             r0=0.75e-3,
@@ -71,10 +71,11 @@ def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=1.0):
             i_bounds=(2 * 94, 2 * 94),
             circuit=circuit,
         ),
-        converter_model=QuadraticLossConverter(power=100e3, **converter_params),
+        converter_model=QuadraticLossConverter(power=180e3, **converter_params),
     )
 
-    solver = opt.SolverFactory("ipopt")
+    # solver = opt.SolverFactory("ipopt")
+    solver = opt.SolverFactory("bonmin")
     return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=max_fec)
 
 
@@ -188,7 +189,7 @@ def run_scenario(scenario: dict, results: dict, position: int = 0) -> None:
 
 
 def run_pool(scenarios: dict) -> dict:
-    num_cores = 8 # os.cpu_count()
+    num_cores = 4  # os.cpu_count()
 
     manager = multiprocessing.Manager()
     results = manager.dict()  # shared dictionary to store results
@@ -205,12 +206,16 @@ def run_pool(scenarios: dict) -> dict:
 # %%
 if __name__ == "__main__":
     config = "data/simulation.local.ini"
-  
+
     year = 2019
     FEC = 1.0
     scenarios = {}
-    for model in ("LP","NL",):
-        for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
+    for model in (
+        # "LP",
+        "NL",
+    ):
+        # for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
+        for R in (1.0, 1.5, 2.0, 3.0):
             scenarios[f"{year} {model} {R=} {FEC=}"] = {
                 "config_file": config,
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
@@ -219,7 +224,7 @@ if __name__ == "__main__":
             }
 
     res = run_pool(scenarios)
-    
+
     profile = f"data/intraday_prices/electricity_prices_germany_{year}.csv"
     price = load_price_timeseries(profile)
 
@@ -228,4 +233,4 @@ if __name__ == "__main__":
     df.to_csv("results/results.csv")
     for name, df in res.items():
         df.index.name = "time"
-        df.to_csv(f"results/{name}.csv")
+        df.to_csv(f"results/{name}-bonmin.csv")
