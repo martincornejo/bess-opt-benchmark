@@ -4,14 +4,15 @@ import sys
 import multiprocessing
 
 from datetime import datetime, timedelta
-from configparser import ConfigParser
 
 import numpy as np
 import pandas as pd
 import pyomo.environ as opt
-
-from simses.main import SimSES
 from tqdm import tqdm
+
+from simses.battery.battery import Battery
+from simses.model.cell.samsung94Ah_nmc import Samsung94AhNMC
+from simses.model.converter.sinamics import SinamicsS120
 
 from optimizer import OptModel
 from linear_model import LinearStorageModel
@@ -35,14 +36,11 @@ def load_price_timeseries(file: str) -> pd.Series:
 
 
 # %%
-def simses_factory(config, soh_r=1.0):
-    # update params
-    config["BATTERY"]["START_RESISTANCE_INC"] = f"{soh_r - 1}"
-
+def simses_factory(start_soc, soh_r=1.0):
     # create simulation instance
-    path = os.path.abspath(".")
-    result_path = os.path.join(path, "results").replace("\\", "/") + "/"
-    return SimSES(path=result_path, name="", simulation_config=config)
+    initial_states = {"start_soh_R": soh_r, "start_soc": start_soc, "start_T": 273.15 + 25}
+    bat = Battery(Samsung94AhNMC(), circuit=(260, 2), initial_states=initial_states)
+    return SinamicsS120(max_power=180e3, storage=bat)
 
 
 # %% [markdown]
@@ -95,35 +93,31 @@ def optimizer_factory(model, profile, soh_r=1.0, max_fec=1.0):
 
 
 # %%
-def run_mpc(name, config_file, profile_file, sim_params, opt_params, horizon_hours=24, position=0):
-    # load config
-    config = ConfigParser()
-    config.read(config_file)  # SimSES and time configs
-
+def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, position=0):
     # time params
-    timestep_sec = float(config["GENERAL"]["time_step"])
+    timestep_sec = 900
     timestep_dt = timedelta(seconds=timestep_sec)
-
-    start_dt = datetime.strptime(config["GENERAL"]["START"], "%Y-%m-%d %H:%M:%S")
-    end_dt = datetime.strptime(config["GENERAL"]["END"], "%Y-%m-%d %H:%M:%S")
     horizon = timedelta(hours=horizon_hours, seconds=-timestep_sec)
 
     ## Price timeseries
     profile = load_price_timeseries(profile_file)
+    profile = profile.loc["2019-01-01":"2019-03-31"]
+    start_dt: datetime = profile.index[0]
+    end_dt: datetime = profile.index[-1]
 
     ## SimSES
-    simses = simses_factory(config, **sim_params)
+    simses = simses_factory(**sim_params)
+    soc_sim = float(simses.storage.state.soc)  # start soc
 
     ## Optimizer
     optimizer = optimizer_factory(profile=profile.loc[start_dt : (start_dt + horizon)], **opt_params)
 
     ## MPC
     # initialization
-    soc_sim = float(config["BATTERY"]["START_SOC"])  # start soc
     df = pd.DataFrame()
 
     # MPC loop
-    timesteps = pd.date_range(start=start_dt, end=end_dt, freq=timestep_dt)
+    timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=timestep_dt)
     pbar = tqdm(timesteps, desc=name, position=position)
     for t in pbar:  # iterate 1 day
         # optses
@@ -150,13 +144,12 @@ def run_mpc(name, config_file, profile_file, sim_params, opt_params, horizon_hou
             soc_opt = res["soc"].iloc[err_count]
 
         # simses
-        simses_time = t + timestep_dt
-        simses.run_one_simulation_step(time=simses_time.timestamp(), power=power_opt)
+        simses.update(power_setpoint=power_opt, dt=timestep_sec)
 
-        soc_sim = simses.state.soc
-        power_sim = simses.state.ac_power_delivered
-        converter_losses = simses.state.pe_losses
-        battery_losses = simses.state.storage_power_loss
+        soc_sim = simses.storage.state.soc
+        power_sim = simses.state.power
+        converter_losses = simses.state.loss
+        battery_losses = simses.storage.state.loss
 
         # write results
         data = {
@@ -170,7 +163,6 @@ def run_mpc(name, config_file, profile_file, sim_params, opt_params, horizon_hou
         df = pd.concat([df, pd.DataFrame(index=[t], data=[data])])
         pbar.refresh()
 
-    simses.close()
     return df
 
 
@@ -205,22 +197,16 @@ def run_pool(scenarios: dict) -> dict:
 
 # %%
 if __name__ == "__main__":
-    config = "data/simulation.local.ini"
-
     year = 2019
-    FEC = 1.0
+    fec = 2.0
     scenarios = {}
-    for model in (
-        # "LP",
-        "NL",
-    ):
+    for model in ("LP", "NL"):
         # for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
-        for R in (1.0, 1.5, 2.0, 3.0):
-            scenarios[f"{year} {model} {R=} {FEC=}"] = {
-                "config_file": config,
+        for r in (1.0, 1.5, 2.0, 3.0):
+            scenarios[f"{year} {model} {r=} {fec=}"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                "sim_params": {"soh_r": R},
-                "opt_params": {"model": model, "soh_r": R, "max_fec": FEC},
+                "sim_params": {"start_soc": 0.0, "soh_r": r},
+                "opt_params": {"model": model, "soh_r": r, "max_fec": fec},
             }
 
     res = run_pool(scenarios)
@@ -233,4 +219,4 @@ if __name__ == "__main__":
     df.to_csv("results/results.csv")
     for name, df in res.items():
         df.index.name = "time"
-        df.to_csv(f"results/{name}-bonmin.csv")
+        df.to_csv(f"results/{name}.csv")
