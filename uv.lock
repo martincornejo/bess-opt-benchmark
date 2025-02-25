@@ -128,6 +128,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "plotly" },
     { name = "pyomo" },
     { name = "scipy" },
     { name = "seaborn" },
@@ -147,6 +148,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "numpy", specifier = ">=2.2.1" },
     { name = "pandas", specifier = ">=2.2.3" },
+    { name = "plotly", specifier = ">=6.0.0" },
     { name = "pyomo", specifier = ">=6.8.2" },
     { name = "scipy", specifier = ">=1.15.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
@@ -900,6 +902,15 @@ wheels = [
 ]
 
 [[package]]
+name = "narwhals"
+version = "1.28.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/65/cc4f1d02d418e587fc5b9b31f3cbb8db83f4b35f91d7b59adfa8d947f644/narwhals-1.28.0.tar.gz", hash = "sha256:a2213fa44a039f724278fb15609889319e7c240403413f2606cc856c8d8f708d", size = 252143 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/aa/eedf2ade0c16a60541ca7acd48665c62dc0d11e1e910467b6c7e6b1eda34/narwhals-1.28.0-py3-none-any.whl", hash = "sha256:45d909ad6240944d447b0dae38074c5a919830dff3868d57b05a5526c1f06fe4", size = 308950 },
+]
+
+[[package]]
 name = "nbclient"
 version = "0.10.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1128,6 +1139,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/13/fc/128cc9cb8f03208bdbf93d3aa862e16d376844a14f9a0ce5cf4507372de4/platformdirs-4.3.6.tar.gz", hash = "sha256:357fb2acbc885b0419afd3ce3ed34564c13c9b95c89360cd9563f73aa5e2b907", size = 21302 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/a6/bc1012356d8ece4d66dd75c4b9fc6c1f6650ddd5991e421177d9f8f671be/platformdirs-4.3.6-py3-none-any.whl", hash = "sha256:73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb", size = 18439 },
+]
+
+[[package]]
+name = "plotly"
+version = "6.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/80/761c14012d6daf18e12b6d1e4f6b218e999bcceb694d7a9b180154f9e4db/plotly-6.0.0.tar.gz", hash = "sha256:c4aad38b8c3d65e4a5e7dd308b084143b9025c2cc9d5317fc1f1d30958db87d3", size = 8111782 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/77/a946f38b57fb88e736c71fbdd737a1aebd27b532bda0779c137f357cf5fc/plotly-6.0.0-py3-none-any.whl", hash = "sha256:f708871c3a9349a68791ff943a5781b1ec04de7769ea69068adcd9202e57653a", size = 14805949 },
 ]
 
 [[package]]
@@ -1388,6 +1412,7 @@ wheels = [
 name = "rpds-py"
 version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/0e/4c797078d00dbf1f63af96e4b3beffb67f71230f58442272b4b1962a61c8/rpds_py-0.23.0.tar.gz", hash = "sha256:ffac3b13182dc1bf648cde2982148dc9caf60f3eedec7ae639e05636389ebf5d", size = 26808 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/37/c811fd70cb891dddb713896801e5062758caa5e3dc6764f92c74c9719c90/rpds_py-0.23.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:c46247ea1382758987417b9c47b05d32dc7f971cd2553e7b3088a76ad48c5a67", size = 363833 },
     { url = "https://files.pythonhosted.org/packages/5e/10/5b86bb62c0498353867d69519fa9a37162c42bf3417d40418535adae347d/rpds_py-0.23.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:fa93e2460b7791872a5dd355438b854a5d9ab317107380c2143d94a1ca5b10a7", size = 349485 },
