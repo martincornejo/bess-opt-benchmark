@@ -98,6 +98,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
     timestep_sec = 900
     timestep_dt = timedelta(seconds=timestep_sec)
     horizon = timedelta(hours=horizon_hours, seconds=-timestep_sec)
+    steps = 4
 
     ## Price timeseries
     profile = load_price_timeseries(profile_file)
@@ -117,7 +118,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
     df = pd.DataFrame()
 
     # MPC loop
-    timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=timestep_dt)
+    timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt*steps))
     pbar = tqdm(timesteps, desc=name, position=position)
     for t in pbar:  # iterate 1 day
         # optses
@@ -134,34 +135,38 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
         status = optimizer.solve(params)
         if status == "optimal":
             res = optimizer.recover_results()
-            power_opt = round(res["power"].iloc[0])
-            soc_opt = res["soc"].iloc[0]
+            power_opt_array = np.round(res["power"].iloc[0:steps])
+            soc_opt_array = res["soc"].iloc[0:steps]
             err_count = 0
         else:
             # if optimizer fails, take the continuation of the result of the previous iteration
             err_count += 1
-            power_opt = res["power"].iloc[err_count]
-            soc_opt = res["soc"].iloc[err_count]
+            power_opt_array = res["power"].iloc[(steps*err_count):(steps*err_count + steps)]
+            soc_opt_array = res["soc"].iloc[(steps*err_count):(steps*err_count + steps)]
 
         # simses
-        simses.update(power_setpoint=power_opt, dt=timestep_sec)
+        for step in range(steps):
+            time = t + (step * timestep_dt)
+            power_opt = power_opt_array[step]
+            soc_opt = soc_opt_array[step]
 
-        soc_sim = simses.storage.state.soc
-        power_sim = simses.state.power
-        converter_losses = simses.state.loss
-        battery_losses = simses.storage.state.loss
+            simses.update(power_setpoint=power_opt, dt=timestep_sec)
 
-        # write results
-        data = {
-            "soc_opt": soc_opt,
-            "soc_sim": soc_sim,
-            "power_opt": power_opt,
-            "power_sim": power_sim,
-            "converter_losses": converter_losses,
-            "battery_losses": battery_losses,
-        }
-        df = pd.concat([df, pd.DataFrame(index=[t], data=[data])])
-        pbar.refresh()
+            soc_sim = simses.storage.state.soc
+            power_sim = simses.state.power
+            converter_losses = simses.state.loss
+            battery_losses = simses.storage.state.loss
+
+            # write results
+            data = {
+                "soc_opt": soc_opt,
+                "soc_sim": soc_sim,
+                "power_opt": power_opt,
+                "power_sim": power_sim,
+                "converter_losses": converter_losses,
+                "battery_losses": battery_losses,
+            }
+            df = pd.concat([df, pd.DataFrame(index=[time], data=[data])])
 
     return df
 
@@ -181,7 +186,7 @@ def run_scenario(scenario: dict, results: dict, position: int = 0) -> None:
 
 
 def run_pool(scenarios: dict) -> dict:
-    num_cores = 4  # os.cpu_count()
+    num_cores = int(os.cpu_count() / 2)
 
     manager = multiprocessing.Manager()
     results = manager.dict()  # shared dictionary to store results
@@ -200,7 +205,10 @@ if __name__ == "__main__":
     year = 2019
     fec = 2.0
     scenarios = {}
-    for model in ("LP", "NL"):
+    for model in (
+        "LP",
+        "NL",
+    ):
         # for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
         for r in (1.0, 1.5, 2.0, 3.0):
             scenarios[f"{year} {model} {r=} {fec=}"] = {
