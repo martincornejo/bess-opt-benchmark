@@ -18,8 +18,6 @@ from optimizer import OptModel
 from linear_model import LinearStorageModel
 from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConverter
 
-from analysis import summary_results
-
 # %% [markdown]
 # ## Price timeseries
 
@@ -48,16 +46,16 @@ def simses_factory(start_soc, soh_r=1.0):
 
 
 # %%
-def build_linear_optimizer(profile, max_fec=1.0):
+def build_linear_optimizer(profile, max_fec=2.0, eff=0.95):
     solver = opt.SolverFactory("appsi_highs")
-    bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=0.95)
+    bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=eff)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
 # %%
-def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=1.0):
+def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
     circuit = (260, 2)
-    converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 30}
+    converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 97}
 
     nl_storage = NonLinearStorageModel(
         energy_capacity=180e3,
@@ -72,17 +70,16 @@ def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=1.0):
         converter_model=QuadraticLossConverter(power=180e3, **converter_params),
     )
 
-    # solver = opt.SolverFactory("ipopt")
     solver = opt.SolverFactory("bonmin")
     return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=max_fec)
 
 
 # %%
-def optimizer_factory(model, profile, soh_r=1.0, max_fec=1.0):
+def optimizer_factory(model, profile, soh_r=1.0, eff=0.95, max_fec=2.0):
     if model == "NL":
         optimizer = build_non_linear_optimizer(profile, soh_r=soh_r, max_fec=max_fec)
     elif model == "LP":
-        optimizer = build_linear_optimizer(profile, max_fec=max_fec)
+        optimizer = build_linear_optimizer(profile, eff=eff, max_fec=max_fec)
     else:
         raise NotImplementedError(f"{model} not supported.")
     return optimizer
@@ -93,17 +90,17 @@ def optimizer_factory(model, profile, soh_r=1.0, max_fec=1.0):
 
 
 # %%
-def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, position=0):
+def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=1, position=0):
     # time params
     timestep_sec = 900
     timestep_dt = timedelta(seconds=timestep_sec)
     horizon = timedelta(hours=horizon_hours, seconds=-timestep_sec)
-    steps = 4
 
     ## Price timeseries
     profile = load_price_timeseries(profile_file)
-    profile = profile.loc["2019-01-01":"2019-03-31"]
+    # profile = profile.resample("5Min").ffill()
     start_dt: datetime = profile.index[0]
+    profile = profile.loc[start_dt : (start_dt + timedelta(days=1))]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
@@ -116,11 +113,11 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
     ## MPC
     # initialization
     df = pd.DataFrame()
+    err_count = 0
 
     # MPC loop
-    timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt*steps))
-    pbar = tqdm(timesteps, desc=name, position=position)
-    for t in pbar:  # iterate 1 day
+    timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
+    for t in tqdm(timesteps, desc=name, position=position, mininterval=1):
         # optses
         timerange = pd.date_range(start=t, end=t + horizon, freq=timestep_dt)
         params = {
@@ -141,8 +138,8 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
         else:
             # if optimizer fails, take the continuation of the result of the previous iteration
             err_count += 1
-            power_opt_array = res["power"].iloc[(steps*err_count):(steps*err_count + steps)]
-            soc_opt_array = res["soc"].iloc[(steps*err_count):(steps*err_count + steps)]
+            power_opt_array = res["power"].iloc[(steps * err_count) : (steps * err_count + steps)]
+            soc_opt_array = res["soc"].iloc[(steps * err_count) : (steps * err_count + steps)]
 
         # simses
         for step in range(steps):
@@ -172,7 +169,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=24, positi
 
 
 # %%
-def run_scenario(scenario: dict, results: dict, position: int = 0) -> None:
+def run_scenario(scenario: dict, position: int = 0) -> None:
     """
     scenario: dict
         name and parameters of simulation scenario
@@ -180,51 +177,47 @@ def run_scenario(scenario: dict, results: dict, position: int = 0) -> None:
         task id to
     """
     name, params = scenario
-    # print(f"Started {name}")
-    results[name] = run_mpc(name, position=position, **params)
-    # print(f"Finished {name}")
+    df = run_mpc(name, position=position, **params)
+    df.index.name = "time"
+    df.to_parquet(f"results/{name}.parquet")
 
 
-def run_pool(scenarios: dict) -> dict:
-    num_cores = int(os.cpu_count() / 2)
-
-    manager = multiprocessing.Manager()
-    results = manager.dict()  # shared dictionary to store results
+def run_parallel(scenarios: dict) -> None:
+    num_cores = 4  # int(os.cpu_count() / 2)
 
     tqdm.set_lock(multiprocessing.RLock())
     with multiprocessing.Pool(processes=num_cores, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
-        tasks = [(scenario, results, position) for position, scenario in enumerate(scenarios.items())]
+        tasks = [(scenario, position) for position, scenario in enumerate(scenarios.items())]
         pool.starmap(run_scenario, tasks)
-
-    tqdm.write("All simulations finished.")
-    return dict(results)
 
 
 # %%
-if __name__ == "__main__":
-    year = 2019
-    fec = 2.0
+def main():
     scenarios = {}
-    for model in (
-        "LP",
-        "NL",
-    ):
-        # for R in (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0):
-        for r in (1.0, 1.5, 2.0, 3.0):
-            scenarios[f"{year} {model} {r=} {fec=}"] = {
+
+    year = 2021
+    fec = 2.0
+
+    model = "LP"
+    for r in (1.0, 1.5, 2.0, 3.0):
+        for eff in (0.93, 0.94, 0.95, 0.96):
+            scenarios[f"{year} {model} {r=} {eff=}"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                 "sim_params": {"start_soc": 0.0, "soh_r": r},
-                "opt_params": {"model": model, "soh_r": r, "max_fec": fec},
+                "opt_params": {"model": model, "eff": eff, "max_fec": fec},
             }
 
-    res = run_pool(scenarios)
+    model = "NL"
+    for r_sim in (1.0, 1.5, 2.0, 3.0):
+        for r_opt in (1.0, 1.5, 2.0, 3.0):
+            scenarios[f"{year} {model} {r=} {eff=}"] = {
+                "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+                "sim_params": {"start_soc": 0.0, "soh_r": r_sim},
+                "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
+            }
 
-    profile = f"data/intraday_prices/electricity_prices_germany_{year}.csv"
-    price = load_price_timeseries(profile)
+    run_parallel(scenarios)
 
-    df = summary_results(res, price)
-    df.sort_values(by="name")
-    df.to_csv("results/results.csv")
-    for name, df in res.items():
-        df.index.name = "time"
-        df.to_csv(f"results/{name}.csv")
+
+if __name__ == "__main__":
+    main()
