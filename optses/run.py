@@ -100,7 +100,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=
     profile = load_price_timeseries(profile_file)
     # profile = profile.resample("5Min").ffill()
     start_dt: datetime = profile.index[0]
-    profile = profile.loc[start_dt : (start_dt + timedelta(days=1))]
+    # profile = profile.loc[start_dt : (start_dt + timedelta(days=1))]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
@@ -142,28 +142,30 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=
             soc_opt_array = res["soc"].iloc[(steps * err_count) : (steps * err_count + steps)]
 
         # simses
-        for step in range(steps):
-            time = t + (step * timestep_dt)
-            power_opt = power_opt_array[step]
-            soc_opt = soc_opt_array[step]
+        for opt_step in range(steps):
+            time_opt = t + (opt_step * timestep_dt)
+            power_opt = power_opt_array[opt_step]
+            soc_opt = soc_opt_array[opt_step]
 
-            simses.update(power_setpoint=power_opt, dt=timestep_sec)
+            for sim_step in range(15):
+                time = time_opt + (sim_step * timedelta(seconds=60))
+                simses.update(power_setpoint=power_opt, dt=60)
 
-            soc_sim = simses.storage.state.soc
-            power_sim = simses.state.power
-            converter_losses = simses.state.loss
-            battery_losses = simses.storage.state.loss
+                soc_sim = simses.storage.state.soc
+                power_sim = simses.state.power
+                converter_losses = simses.state.loss
+                battery_losses = simses.storage.state.loss
 
-            # write results
-            data = {
-                "soc_opt": soc_opt,
-                "soc_sim": soc_sim,
-                "power_opt": power_opt,
-                "power_sim": power_sim,
-                "converter_losses": converter_losses,
-                "battery_losses": battery_losses,
-            }
-            df = pd.concat([df, pd.DataFrame(index=[time], data=[data])])
+                # write results
+                data = {
+                    "soc_opt": soc_opt,
+                    "soc_sim": soc_sim,
+                    "power_opt": power_opt,
+                    "power_sim": power_sim,
+                    "converter_losses": converter_losses,
+                    "battery_losses": battery_losses,
+                }
+                df = pd.concat([df, pd.DataFrame(index=[time], data=[data])])
 
     return df
 
@@ -183,7 +185,7 @@ def run_scenario(scenario: dict, position: int = 0) -> None:
 
 
 def run_parallel(scenarios: dict) -> None:
-    num_cores = 4  # int(os.cpu_count() / 2)
+    num_cores = 16  # int(os.cpu_count() / 2)
 
     tqdm.set_lock(multiprocessing.RLock())
     with multiprocessing.Pool(processes=num_cores, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
@@ -198,21 +200,21 @@ def main():
     year = 2021
     fec = 2.0
 
-    model = "LP"
-    for r in (1.0, 1.5, 2.0, 3.0):
-        for eff in (0.93, 0.94, 0.95, 0.96):
-            scenarios[f"{year} {model} {r=} {eff=}"] = {
-                "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                "sim_params": {"start_soc": 0.0, "soh_r": r},
-                "opt_params": {"model": model, "eff": eff, "max_fec": fec},
-            }
+    # model = "LP"
+    # for r in (1.0, 1.5, 2.0, 3.0):
+    #     for eff in (0.93, 0.94, 0.95, 0.96):
+    #         scenarios[f"{year} {model} {r=} {eff=}"] = {
+    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
+    #             "opt_params": {"model": model, "eff": eff, "max_fec": fec},
+    #         }
 
     model = "NL"
-    for r_sim in (1.0, 1.5, 2.0, 3.0):
+    for r in (1.0, 1.5, 2.0, 3.0):
         for r_opt in (1.0, 1.5, 2.0, 3.0):
-            scenarios[f"{year} {model} {r=} {eff=}"] = {
+            scenarios[f"{year} {model} {r=} {r_opt=}"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                "sim_params": {"start_soc": 0.0, "soh_r": r_sim},
+                "sim_params": {"start_soc": 0.0, "soh_r": r},
                 "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
             }
 
