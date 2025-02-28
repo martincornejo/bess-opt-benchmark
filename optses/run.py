@@ -100,7 +100,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=
     profile = load_price_timeseries(profile_file)
     # profile = profile.resample("5Min").ffill()
     start_dt: datetime = profile.index[0]
-    # profile = profile.loc[start_dt : (start_dt + timedelta(days=1))]
+    profile = profile.loc[start_dt : (start_dt + timedelta(weeks=4))]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
@@ -185,7 +185,7 @@ def run_scenario(scenario: dict, position: int = 0) -> None:
 
 
 def run_parallel(scenarios: dict) -> None:
-    num_cores = 16  # int(os.cpu_count() / 2)
+    num_cores = 4  # int(os.cpu_count() / 2)
 
     tqdm.set_lock(multiprocessing.RLock())
     with multiprocessing.Pool(processes=num_cores, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
@@ -201,8 +201,9 @@ def main():
     fec = 2.0
 
     # model = "LP"
-    # for r in (1.0, 1.5, 2.0, 3.0):
-    #     for eff in (0.93, 0.94, 0.95, 0.96):
+    # # for r in (1.0, 1.5, 2.0, 3.0):
+    # for r in (1.2, 1.5, 1.7, 2.5):
+    #     for eff in (0.7, 0.8, 0.82, 0.85, 0.87, 0.9, 0.92, 0.95):
     #         scenarios[f"{year} {model} {r=} {eff=}"] = {
     #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
     #             "sim_params": {"start_soc": 0.0, "soh_r": r},
@@ -210,8 +211,8 @@ def main():
     #         }
 
     model = "NL"
-    for r in (1.0, 1.5, 2.0, 3.0):
-        for r_opt in (1.0, 1.5, 2.0, 3.0):
+    for r in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
+        for r_opt in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
             scenarios[f"{year} {model} {r=} {r_opt=}"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                 "sim_params": {"start_soc": 0.0, "soh_r": r},
