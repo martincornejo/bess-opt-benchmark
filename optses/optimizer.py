@@ -40,7 +40,7 @@ class OptModel:
 
         @model.Expression()
         def fec(m):
-            return sum(m.bess.powerc[t] + m.bess.powerd[t] for t in model.time) / 2 / m.bess.energy_capacity
+            return sum(m.bess.powerc[t] + m.bess.powerd[t] for t in model.time) * model.dt / 2 / m.bess.energy_capacity
 
         @model.Constraint()
         def throughput_constraint(m):
@@ -48,7 +48,7 @@ class OptModel:
 
         @model.Objective()
         def cost(m):
-            return sum(m.bess.power[t] * m.profile.price[t] * model.dt for t in model.time)
+            return sum(m.bess.power[t] * m.profile.price[t] for t in model.time) * model.dt
 
     def recover_results(self):
         model = self.model
