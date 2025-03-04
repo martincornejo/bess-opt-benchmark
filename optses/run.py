@@ -1,5 +1,4 @@
-import os
-import sys
+import time
 import logging
 import multiprocessing
 from functools import partial
@@ -43,12 +42,18 @@ def run_scenario(scenario, queue, lock) -> None:
     slot = queue.get()  # progress bar position
 
     try:
+        start_time = time.time()  # start timer
         # position+1 so we do not overwrite the overall progress
         tqdm_options = {"position": slot, "mininterval": 1.0, "leave": False}
         df = run_mpc(name, tqdm_options=tqdm_options, **params)
         df.index.name = "time"
         df.to_parquet(f"results/{name}.parquet")
-        log.info(f"Simulation {name} finished.")
+
+        # log
+        elapsed_time = time.time() - start_time
+        hours, rem = divmod(elapsed_time, 3600)
+        minutes, seconds = divmod(rem, 60)
+        log.info(f"Simulation {name} finished in {int(hours)}:{int(minutes)}:{int(seconds)}.")  # TODO format into int
     except ValueError:
         log.error(f"Simulation {name} error.")
     finally:
