@@ -90,25 +90,27 @@ def optimizer_factory(model, profile, soh_r=1.0, eff=0.95, max_fec=2.0):
 
 
 # %%
-def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=1, position=0):
+def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, timestep_sec=900, position=0):
     # time params
-    timestep_sec = 900
+    # timestep_sec = 60
     timestep_dt = timedelta(seconds=timestep_sec)
     horizon = timedelta(hours=horizon_hours, seconds=-timestep_sec)
 
     ## Price timeseries
     profile = load_price_timeseries(profile_file)
-    # profile = profile.resample("5Min").ffill()
+    profile = profile.resample(timestep_dt).ffill()
     start_dt: datetime = profile.index[0]
-    profile = profile.loc[start_dt : (start_dt + timedelta(weeks=4))]
+    profile = profile.loc[start_dt : (start_dt + timedelta(weeks=1))]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
     simses = simses_factory(**sim_params)
+    sim_steps = int(timestep_sec / 60)  #
     soc_sim = float(simses.storage.state.soc)  # start soc
 
     ## Optimizer
     optimizer = optimizer_factory(profile=profile.loc[start_dt : (start_dt + horizon)], **opt_params)
+    steps = int(900 / timestep_sec)  # we run an optimization every 15 min
 
     ## MPC
     # initialization
@@ -147,7 +149,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, steps=
             power_opt = power_opt_array[opt_step]
             soc_opt = soc_opt_array[opt_step]
 
-            for sim_step in range(15):
+            for sim_step in range(sim_steps):  # 1 min steps
                 time = time_opt + (sim_step * timedelta(seconds=60))
                 simses.update(power_setpoint=power_opt, dt=60)
 
@@ -198,7 +200,9 @@ def main():
     scenarios = {}
 
     year = 2021
-    fec = 2.0
+
+    horizon = 12  # h
+    fec = 2.0 * (24 / horizon)  # 2 cycles per day
 
     # model = "LP"
     # # for r in (1.0, 1.5, 2.0, 3.0):
@@ -210,13 +214,24 @@ def main():
     #             "opt_params": {"model": model, "eff": eff, "max_fec": fec},
     #         }
 
+    # model = "NL"
+    # for r in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
+    #     for r_opt in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
+    #         scenarios[f"{year} {model} {r=} {r_opt=}"] = {
+    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
+    #             "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
+    #         }
+
     model = "NL"
-    for r in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-        for r_opt in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-            scenarios[f"{year} {model} {r=} {r_opt=}"] = {
+    for dt in (1, 5, 15):
+        for r in (1.0, 1.5, 2.0, 3.0):
+            scenarios[f"{year} {model} {r=} {dt}min"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                 "sim_params": {"start_soc": 0.0, "soh_r": r},
-                "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
+                "opt_params": {"model": model, "soh_r": r, "max_fec": fec},
+                "horizon_hours": horizon,
+                "timestep_sec": dt * 60,
             }
 
     run_parallel(scenarios)
