@@ -1,8 +1,4 @@
 # %%
-import os
-import sys
-import multiprocessing
-
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -90,7 +86,19 @@ def optimizer_factory(model, profile, soh_r=1.0, eff=0.95, max_fec=2.0):
 
 
 # %%
-def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, timestep_sec=900, position=0):
+def run_mpc(
+    name,
+    profile_file,
+    sim_params,
+    opt_params,
+    horizon_hours=12,
+    timestep_sec=900,
+    tqdm_options=dict | None,
+):
+    #
+    if tqdm_options is None:
+        tqdm_options = {"position": 0}
+
     # time params
     # timestep_sec = 60
     timestep_dt = timedelta(seconds=timestep_sec)
@@ -119,7 +127,7 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, timest
 
     # MPC loop
     timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
-    for t in tqdm(timesteps, desc=name, position=position, mininterval=1):
+    for t in tqdm(timesteps, desc=name, **tqdm_options):
         # optses
         timerange = pd.date_range(start=t, end=t + horizon, freq=timestep_dt)
         params = {
@@ -170,72 +178,3 @@ def run_mpc(name, profile_file, sim_params, opt_params, horizon_hours=12, timest
                 df = pd.concat([df, pd.DataFrame(index=[time], data=[data])])
 
     return df
-
-
-# %%
-def run_scenario(scenario: dict, position: int = 0) -> None:
-    """
-    scenario: dict
-        name and parameters of simulation scenario
-    position: int
-        task id to
-    """
-    name, params = scenario
-    df = run_mpc(name, position=position, **params)
-    df.index.name = "time"
-    df.to_parquet(f"results/{name}.parquet")
-
-
-def run_parallel(scenarios: dict) -> None:
-    num_cores = 4  # int(os.cpu_count() / 2)
-
-    tqdm.set_lock(multiprocessing.RLock())
-    with multiprocessing.Pool(processes=num_cores, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
-        tasks = [(scenario, position) for position, scenario in enumerate(scenarios.items())]
-        pool.starmap(run_scenario, tasks)
-
-
-# %%
-def main():
-    scenarios = {}
-
-    year = 2021
-
-    horizon = 12  # h
-    fec = 2.0 * (horizon / 24)  # 2 cycles per day
-
-    # model = "LP"
-    # # for r in (1.0, 1.5, 2.0, 3.0):
-    # for r in (1.2, 1.5, 1.7, 2.5):
-    #     for eff in (0.7, 0.8, 0.82, 0.85, 0.87, 0.9, 0.92, 0.95):
-    #         scenarios[f"{year} {model} {r=} {eff=}"] = {
-    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
-    #             "opt_params": {"model": model, "eff": eff, "max_fec": fec},
-    #         }
-
-    # model = "NL"
-    # for r in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-    #     for r_opt in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-    #         scenarios[f"{year} {model} {r=} {r_opt=}"] = {
-    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
-    #             "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
-    #         }
-
-    model = "NL"
-    for dt in (1, 5, 15):
-        for r in (1.0, 1.5, 2.0, 3.0):
-            scenarios[f"{year} {model} {r=} {dt}min"] = {
-                "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                "sim_params": {"start_soc": 0.0, "soh_r": r},
-                "opt_params": {"model": model, "soh_r": r, "max_fec": fec},
-                "horizon_hours": horizon,
-                "timestep_sec": dt * 60,
-            }
-
-    run_parallel(scenarios)
-
-
-if __name__ == "__main__":
-    main()
