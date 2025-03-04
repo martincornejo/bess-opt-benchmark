@@ -202,7 +202,7 @@ def main():
     year = 2021
 
     horizon = 12  # h
-    fec = 2.0 * (24 / horizon)  # 2 cycles per day
+    fec = 2.0 * (horizon / 24)  # 2 cycles per day
 
     # model = "LP"
     # # for r in (1.0, 1.5, 2.0, 3.0):
