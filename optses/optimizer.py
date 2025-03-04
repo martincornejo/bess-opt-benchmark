@@ -7,7 +7,6 @@ from pyomo.core.base.param import ScalarParam, IndexedParam
 class OptModel:
     def __init__(self, solver, storage_model, profile, max_period_fec=1.0) -> None:
         self.model = opt.ConcreteModel()
-        # self.solver = opt.SolverFactory("appsi_highs")
         self.solver = solver
         self.storage_model = storage_model
         self.build_model(profile, max_period_fec)
@@ -80,8 +79,3 @@ class OptModel:
 
         status = self.solver.solve(self.model)
         return status["Solver"][0]["Termination condition"]
-
-        # if status["Solver"][0]["Termination condition"] == "optimal":
-        #     return self.recover_results()
-        # else:
-        #     return None  # TODO: best way to handle?
