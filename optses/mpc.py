@@ -153,7 +153,7 @@ def run_mpc(
     opt_params: dict,
     horizon_hours: int = 12,
     timestep_sec: int = 900,
-    sim_time: timedelta | None = None,
+    total_time: timedelta | None = None,
     tqdm_options: dict | None = None,
 ) -> pd.DataFrame:
     """
@@ -174,7 +174,7 @@ def run_mpc(
         Time horizon of one optimization schedule in hours, by default 12.
     timestep_sec: int = 900
         The time resolution of the optimizer schedule in seconds, by default 900 (15 min).
-    sim_time: timedelta, optional
+    total_time: timedelta, optional
         Total MPC simulation horizon, by default the full time window of the input price time series is used.
     tqdm_options: dict, optional
         Configuration for the `tqdm` progress bar, by default {"position": 0}.
@@ -196,8 +196,8 @@ def run_mpc(
     profile = load_price_timeseries(profile_file)
     profile = profile.resample(timestep_dt).ffill()
     start_dt: datetime = profile.index[0]
-    if sim_time is not None:
-        profile = profile.loc[start_dt : (start_dt + sim_time)]
+    if total_time is not None:
+        profile = profile.loc[start_dt : (start_dt + total_time)]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
