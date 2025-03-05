@@ -14,42 +14,84 @@ from optimizer import OptModel
 from linear_model import LinearStorageModel
 from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConverter
 
-# %% [markdown]
-# ## Price timeseries
 
-
-# %%
 def load_price_timeseries(file: str) -> pd.Series:
+    """
+    Reads a price timeseries data from a CSV file.
+    
+    Parameters
+    ----------
+    file: str
+        Location of CSV file.
+
+    Returns
+    -------
+    pandas.Series
+        A timeseries with ID1 price data in €/MWh.
+    """
     df = pd.read_csv(file)
     df.index = pd.to_datetime(df["Date"], format="%d/%m/%Y %H:%M")
-    return df["Intraday Continuous 15 minutes ID1-Price"]  # * 1e-6 # €/MWh -> €/Wh
+    return df["Intraday Continuous 15 minutes ID1-Price"]
 
 
-# %% [markdown]
-# ## SimSES
-
-
-# %%
-def simses_factory(start_soc, soh_r=1.0):
+def simses_factory(start_soc: float, soh_r: float = 1.0):
+    """
+    Create simulation model based on parameters.
+    
+    Parameters
+    ----------
+    start_soc: float
+        Initial SOC of the storage system at the start of the simulation.
+    soh_r: float = 1.0
+        Internal resistance increase of the battery in p.u., by default the battery is at begining-of-life (soh_r = 1).
+    """
     # create simulation instance
     initial_states = {"start_soh_R": soh_r, "start_soc": start_soc, "start_T": 273.15 + 25}
     bat = Battery(Samsung94AhNMC(), circuit=(260, 2), initial_states=initial_states)
     return SinamicsS120(max_power=180e3, storage=bat)
 
 
-# %% [markdown]
-# ## Optimizer
+def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float = 0.95) -> OptModel:
+    """
+    Configures and creates a linear optimizer.
+    
+    Parameters
+    ----------
+    profile: pandas.Series
+        Time series of price data. This is also used to define the optimization horizon and the time resolution of the steps.
+    max_fec: float = 2.0
+        Limit of full-equivalent-cycles (FEC) during the optimization horizon.
+    eff: float = 0.95
+        Unidirectional (charge or discharge) efficiency of the system in p.u., by default 95 %
 
-
-# %%
-def build_linear_optimizer(profile, max_fec=2.0, eff=0.95):
+    Returns
+    -------
+    OptModel
+        An instance of the configured optimizer.
+    """
     solver = opt.SolverFactory("appsi_highs")
     bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=eff)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
-# %%
-def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
+def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: float = 2.0) -> OptModel:
+    """
+    Configures and creates a non-linear optimizer.
+
+    Parameters
+    ----------
+    profile: pandas.Series
+        Time series of price data. This is also used to define the optimization horizon and the time resolution of the steps.
+    soh_r: float = 1.0
+        Internal resistance increase of the battery in p.u., by default the battery is at begining-of-life (soh_r = 1).
+    max_fec: float = 2.0
+        Limit of full-equivalent-cycles (FEC) during the optimization horizon.
+
+    Returns
+    -------
+    OptModel
+        An instance of the configured optimizer.
+    """
     circuit = (260, 2)
     converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 97}
 
@@ -70,8 +112,31 @@ def build_non_linear_optimizer(profile, soh_r=1.0, max_fec=2.0):
     return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=max_fec)
 
 
-# %%
-def optimizer_factory(model, profile, soh_r=1.0, eff=0.95, max_fec=2.0):
+def optimizer_factory(model: str, profile: pd.Series, soh_r: float = 1.0, eff: float = 0.95, max_fec: float = 2.0) -> OptModel:
+    """
+    Configures and creates an optimizer based on the specified model type.
+
+    Parameters
+    ----------
+    model : str
+        The type of model to use for optimization. Supported models are:
+        - "NL": Non-linear model.
+        - "LP": Linear programming model.
+    profile : pd.Series
+        Time series of price data. This is used to define the optimization horizon and the time resolution of the steps.
+    max_fec : float = 2.0
+        Maximum feasible full equivalent cycles (FEC) during the optimization horizon, relevant for both models.
+    soh_r : float = 1.0
+        State of health ratio, relevant for the non-linear model.
+    eff : float = 0.95
+        Efficiency factor, relevant for the linear programming model.
+
+    
+    Returns
+    -------
+    OptModel
+        An instance of the configured optimizer.
+    """
     if model == "NL":
         optimizer = build_non_linear_optimizer(profile, soh_r=soh_r, max_fec=max_fec)
     elif model == "LP":
@@ -81,26 +146,49 @@ def optimizer_factory(model, profile, soh_r=1.0, eff=0.95, max_fec=2.0):
     return optimizer
 
 
-# %% [markdown]
-# ## MPC
-
-
-# %%
 def run_mpc(
-    name,
-    profile_file,
-    sim_params,
-    opt_params,
-    horizon_hours=12,
-    timestep_sec=900,
-    tqdm_options=dict | None,
-):
-    #
+    name: str,
+    profile_file: str,
+    sim_params: dict,
+    opt_params: dict,
+    horizon_hours: int = 12,
+    timestep_sec: int = 900,
+    sim_time: timedelta | None = None,
+    tqdm_options: dict | None = None,
+) -> pd.DataFrame:
+    """
+    Simulates a receding horizon MPC operation. Iteratively, every 15 min, the optimizer receives the system states and future prices to schedule the operation for the next horizon. 
+    The first 15 min of the schedule are passed to the system simulator which performs the 'real' dispatch and updates its state. 
+
+    Parameters
+    ----------
+    name: str
+        Simulation ID to display in the progress tracker.
+    profile_file: str
+        File location of the electricity price time series.
+    sim_params: dict
+        Parameters of the system simulator, see `simses_factory`.
+    opt_params: dict
+        Parameters of the optimizer, see `optimizer_factory`.
+    horizon_hours: int = 12
+        Time horizon of one optimization schedule in hours, by default 12.
+    timestep_sec: int = 900
+        The time resolution of the optimizer schedule in seconds, by default 900 (15 min).
+    sim_time: timedelta, optional
+        Total MPC simulation horizon, by default the full time window of the input price time series is used.
+    tqdm_options: dict, optional
+        Configuration for the `tqdm` progress bar, by default {"position": 0}.
+
+    Returns
+    -------
+    df: pandas.DataFrame
+        DataFrame with the timeseries of the optimizer and simulation results.
+    """
+    # progress bar default config
     if tqdm_options is None:
         tqdm_options = {"position": 0}
 
     # time params
-    # timestep_sec = 60
     timestep_dt = timedelta(seconds=timestep_sec)
     horizon = timedelta(hours=horizon_hours, seconds=-timestep_sec)
 
@@ -108,7 +196,8 @@ def run_mpc(
     profile = load_price_timeseries(profile_file)
     profile = profile.resample(timestep_dt).ffill()
     start_dt: datetime = profile.index[0]
-    profile = profile.loc[start_dt : (start_dt + timedelta(weeks=1))]
+    if sim_time is not None:
+        profile = profile.loc[start_dt : (start_dt + sim_time)]
     end_dt: datetime = profile.index[-1]
 
     ## SimSES
@@ -128,7 +217,7 @@ def run_mpc(
     # MPC loop
     timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
     for t in tqdm(timesteps, desc=name, **tqdm_options):
-        # optses
+        # optses - solve optimal schedule
         timerange = pd.date_range(start=t, end=t + horizon, freq=timestep_dt)
         params = {
             "bess": {
@@ -151,7 +240,7 @@ def run_mpc(
             power_opt_array = res["power"].iloc[(steps * err_count) : (steps * err_count + steps)]
             soc_opt_array = res["soc"].iloc[(steps * err_count) : (steps * err_count + steps)]
 
-        # simses
+        # simses - simulate the next 15 min
         for opt_step in range(steps):
             time_opt = t + (opt_step * timestep_dt)
             power_opt = power_opt_array[opt_step]
