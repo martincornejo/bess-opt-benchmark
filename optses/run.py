@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 import multiprocessing
@@ -43,7 +44,6 @@ def run_scenario(scenario, queue, lock) -> None:
 
     try:
         start_time = time.time()  # start timer
-        # position+1 so we do not overwrite the overall progress
         tqdm_options = {"position": slot, "mininterval": 1.0, "leave": False}
         df = run_mpc(name, tqdm_options=tqdm_options, **params)
         df.index.name = "time"
@@ -53,7 +53,7 @@ def run_scenario(scenario, queue, lock) -> None:
         elapsed_time = time.time() - start_time
         hours, rem = divmod(elapsed_time, 3600)
         minutes, seconds = divmod(rem, 60)
-        log.info(f"Simulation {name} finished in {int(hours)}:{int(minutes)}:{int(seconds)}.")  # TODO format into int
+        log.info(f"Simulation {name} finished in {int(hours):02}:{int(minutes):02}:{int(seconds):02}.")
     except ValueError:
         log.error(f"Simulation {name} error.")
     finally:
@@ -61,19 +61,22 @@ def run_scenario(scenario, queue, lock) -> None:
 
 
 def run_parallel(scenarios: dict) -> None:
-    workers = 4  # int(os.cpu_count() / 2)
+    workers = os.cpu_count()
 
     with multiprocessing.Manager() as manager:
-        # Initialize the queue with available slots
+        # Initialize the queue with available slots for a progress bar.
+        # We start at 1 since position 0 tracks the overall progress.
         queue = manager.Queue()
-        for i in range(1, workers + 1):
+        for i in range(1, workers + 1): 
             queue.put(i)
 
-        lock = manager.RLock()
+        # for logging and displaying the progress bars without race conditions
+        lock = manager.RLock() 
 
-        pbar = tqdm(desc="Total simulations", total=len(scenarios))
+        # pass the queue and lock to the scenario runner
         run_scenario_worker = partial(run_scenario, queue=queue, lock=lock)
-
+        
+        pbar = tqdm(desc="Total simulations", total=len(scenarios)) # progress bar of all simulations
         with ProcessPoolExecutor(workers, initializer=tqdm.set_lock, initargs=(lock,)) as pool:
             futures = [pool.submit(run_scenario_worker, scenario) for scenario in scenarios.items()]
             for future in as_completed(futures):
@@ -90,34 +93,27 @@ def main():
     fec = 2.0 * (horizon / 24)  # 2 cycles per day
 
     model = "LP"
-    # for r in (1.0, 1.5, 2.0, 3.0):
-    for r in (1.2, 1.5, 1.7, 2.5):
-        for eff in (0.7, 0.8, 0.82, 0.85, 0.87, 0.9, 0.92, 0.95):
+    for r in (1.0, 1.5, 2.0, 3.0):
+        for eff in (0.85, 0.9, 0.92, 0.95):
             scenarios[f"{year} {model} {r=} {eff=}"] = {
                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                 "sim_params": {"start_soc": 0.0, "soh_r": r},
                 "opt_params": {"model": model, "eff": eff, "max_fec": fec},
+                "horizon_hours": horizon,
+                "timestep_sec": 900, # 15 min
             }
-
-    # model = "NL"
-    # for r in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-    #     for r_opt in (1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0):
-    #         scenarios[f"{year} {model} {r=} {r_opt=}"] = {
-    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
-    #             "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
-    #         }
 
     # model = "NL"
     # for dt in (1, 5, 15):
     #     for r in (1.0, 1.5, 2.0, 3.0):
-    #         scenarios[f"{year} {model} {r=} {dt}min"] = {
-    #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-    #             "sim_params": {"start_soc": 0.0, "soh_r": r},
-    #             "opt_params": {"model": model, "soh_r": r, "max_fec": fec},
-    #             "horizon_hours": horizon,
-    #             "timestep_sec": dt * 60,
-    #         }
+    #         for r_opt in (1.0, 1.5, 2.0, 3.0):
+    #             scenarios[f"{year} {model} {r=} {r_opt=} {dt}min"] = {
+    #                 "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+    #                 "sim_params": {"start_soc": 0.0, "soh_r": r},
+    #                 "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
+    #                 "horizon_hours": horizon,
+    #                 "timestep_sec": dt * 60,
+    #             }
 
     run_parallel(scenarios)
 
