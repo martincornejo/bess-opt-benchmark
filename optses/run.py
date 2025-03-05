@@ -3,6 +3,7 @@ import time
 import logging
 import multiprocessing
 from functools import partial
+from datetime import timedelta
 
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -101,6 +102,7 @@ def main():
                 "opt_params": {"model": model, "eff": eff, "max_fec": fec},
                 "horizon_hours": horizon,
                 "timestep_sec": 900, # 15 min
+                "total_time": timedelta(weeks=4),
             }
 
     # model = "NL"
