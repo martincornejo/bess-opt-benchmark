@@ -4,3 +4,7 @@
 ## Setup
 
 Install solvers: https://portal.ampl.com/user/ampl/download/coin
+
+Setup environment:
+- Install the Python package manager `uv`: https://docs.astral.sh/uv/
+- Install all dependencies by running `uv sync`
