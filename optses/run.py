@@ -113,7 +113,7 @@ def main():
                 scenarios[f"{year} {model} {fec=} {r=} {r_opt=}"] = {
                     "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                     "sim_params": {"start_soc": 0.0, "soh_r": r},
-                    "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec},
+                    "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec * (horizon / 24)},
                     "horizon_hours": horizon,
                     "timestep_sec": 900, # 15 min
                     "total_time": timedelta(weeks=4),
