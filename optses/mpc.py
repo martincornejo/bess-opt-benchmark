@@ -12,7 +12,7 @@ from simses.model.converter.sinamics import SinamicsS120
 
 from optimizer import OptModel
 from linear_model import LinearStorageModel
-from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConverter
+from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConverter, ConstantEfficiencyConverter
 
 
 def load_price_timeseries(file: str) -> pd.Series:
@@ -101,11 +101,12 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
             capacity=94,
             r0=0.75e-3,
             soh_r=soh_r,
-            v_bounds=(3.2, 4.2),
+            v_bounds=(2.7, 4.15),
             i_bounds=(2 * 94, 2 * 94),
             circuit=circuit,
         ),
         converter_model=QuadraticLossConverter(power=180e3, **converter_params),
+        # converter_model=ConstantEfficiencyConverter(power=180e3, effc=0.97),
     )
 
     solver = opt.SolverFactory("bonmin")
@@ -212,6 +213,7 @@ def run_mpc(
     ## MPC
     # initialization
     df = pd.DataFrame()
+    res = pd.DataFrame()
     err_count = 0
 
     # MPC loop
@@ -231,14 +233,15 @@ def run_mpc(
         status = optimizer.solve(params)
         if status == "optimal":
             res = optimizer.recover_results()
-            power_opt_array = np.round(res["power"].iloc[0:steps])
-            soc_opt_array = res["soc"].iloc[0:steps]
+            power_opt_array = np.round(res["power"].iloc[0:steps].to_numpy())
+            soc_opt_array = res["soc"].iloc[0:steps].to_numpy()
             err_count = 0
         else:
             # if optimizer fails, take the continuation of the result of the previous iteration
             err_count += 1
-            power_opt_array = res["power"].iloc[(steps * err_count) : (steps * err_count + steps)]
-            soc_opt_array = res["soc"].iloc[(steps * err_count) : (steps * err_count + steps)]
+            offset = steps * err_count
+            power_opt_array = np.round(res["power"].iloc[offset : (offset + steps)].to_numpy())
+            soc_opt_array = res["soc"].iloc[offset : (offset + steps)].to_numpy()
 
         # simses - simulate the next 15 min
         for opt_step in range(steps):

@@ -77,5 +77,10 @@ class OptModel:
             for update in updates:
                 self.update_model(update)
 
-        status = self.solver.solve(self.model)
-        return status["Solver"][0]["Termination condition"]
+        try: 
+            solution = self.solver.solve(self.model)
+            status = solution.solver.termination_condition
+        except ValueError:
+            status = "error"  # should not be necessary, but pyomo errors anyway
+        
+        return status
