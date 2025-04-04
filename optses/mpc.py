@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from simses.battery.battery import Battery
 from simses.model.cell.samsung94Ah_nmc import Samsung94AhNMC
-from simses.model.converter.sinamics import SinamicsS120
+from simses.model.converter.sinamics import SinamicsS120Fit
 
 from optimizer import OptModel
 from linear_model import LinearStorageModel
@@ -48,7 +48,7 @@ def simses_factory(start_soc: float, soh_r: float = 1.0):
     # create simulation instance
     initial_states = {"start_soh_R": soh_r, "start_soc": start_soc, "start_T": 273.15 + 25}
     bat = Battery(Samsung94AhNMC(), circuit=(260, 2), initial_states=initial_states)
-    return SinamicsS120(max_power=180e3, storage=bat)
+    return SinamicsS120Fit(max_power=180e3, storage=bat)
 
 
 def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float = 0.95) -> OptModel:
