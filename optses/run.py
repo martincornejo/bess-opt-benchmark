@@ -56,7 +56,7 @@ def run_scenario(scenario, queue, lock) -> None:
         minutes, seconds = divmod(rem, 60)
         log.info(f"Simulation {name} finished in {int(hours):02}:{int(minutes):02}:{int(seconds):02}.")
     except Exception as e:
-        log.error(f"Simulation {name} failed with error: {e}")
+        log.error(f"Simulation {name} failed with {type(e).__name__}: {e}")
     finally:
         queue.put(slot)  # free progress bar position
 
