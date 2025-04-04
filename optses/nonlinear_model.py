@@ -68,7 +68,7 @@ class RintModel:
         block.soh_r = opt.Param(initialize=self._soh_r, mutable=True)
 
         @block.Expression()
-        def r(b, t):
+        def r(b):
             return b.r0 * b.soh_r
 
         # vars
@@ -159,9 +159,9 @@ class RintModel:
         # def soc_end_constraint(b):
         #     return b.soc[model.time.last()] >= b.soc_start
 
-        @block.Expression()
-        def fec(b):
-            return sum(b.ic[t] + b.id[t] for t in model.time) * model.dt / b.capacity / 2
+        # @block.Expression()
+        # def fec(b):
+        #     return sum(b.ic[t] + b.id[t] for t in model.time) * model.dt / b.capacity / 2
 
 
 class QuadraticLossConverter:
