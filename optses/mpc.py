@@ -86,6 +86,8 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
         Internal resistance increase of the battery in p.u., by default the battery is at begining-of-life (soh_r = 1).
     max_fec: float = 2.0
         Limit of full-equivalent-cycles (FEC) during the optimization horizon.
+    converter_model: str = "quadratic"
+        Model type for conversion losses of the inverter: "quadratic" (default) or "constant"
 
     Returns
     -------
@@ -118,7 +120,7 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
     return OptModel(solver=solver, storage_model=nl_storage, profile=profile, max_period_fec=max_fec)
 
 
-def optimizer_factory(model: str, profile: pd.Series, soh_r: float = 1.0, eff: float = 0.95, max_fec: float = 2.0) -> OptModel:
+def optimizer_factory(model: str, profile: pd.Series, **kwargs) -> OptModel:
     """
     Configures and creates an optimizer based on the specified model type.
 
@@ -130,12 +132,8 @@ def optimizer_factory(model: str, profile: pd.Series, soh_r: float = 1.0, eff: f
         - "LP": Linear programming model.
     profile : pd.Series
         Time series of price data. This is used to define the optimization horizon and the time resolution of the steps.
-    max_fec : float = 2.0
-        Maximum feasible full equivalent cycles (FEC) during the optimization horizon, relevant for both models.
-    soh_r : float = 1.0
-        State of health ratio, relevant for the non-linear model.
-    eff : float = 0.95
-        Efficiency factor, relevant for the linear programming model.
+    **kwargs:
+        Keyword arguments to be passed to the models.
 
 
     Returns
@@ -144,9 +142,9 @@ def optimizer_factory(model: str, profile: pd.Series, soh_r: float = 1.0, eff: f
         An instance of the configured optimizer.
     """
     if model == "NL":
-        optimizer = build_non_linear_optimizer(profile, soh_r=soh_r, max_fec=max_fec)
+        optimizer = build_non_linear_optimizer(profile, **kwargs)
     elif model == "LP":
-        optimizer = build_linear_optimizer(profile, eff=eff, max_fec=max_fec)
+        optimizer = build_linear_optimizer(profile, **kwargs)
     else:
         raise NotImplementedError(f"{model} not supported.")
     return optimizer
