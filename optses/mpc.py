@@ -18,7 +18,7 @@ from nonlinear_model import NonLinearStorageModel, RintModel, QuadraticLossConve
 def load_price_timeseries(file: str) -> pd.Series:
     """
     Reads a price timeseries data from a CSV file.
-    
+
     Parameters
     ----------
     file: str
@@ -37,7 +37,7 @@ def load_price_timeseries(file: str) -> pd.Series:
 def simses_factory(start_soc: float, soh_r: float = 1.0):
     """
     Create simulation model based on parameters.
-    
+
     Parameters
     ----------
     start_soc: float
@@ -54,7 +54,7 @@ def simses_factory(start_soc: float, soh_r: float = 1.0):
 def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float = 0.95) -> OptModel:
     """
     Configures and creates a linear optimizer.
-    
+
     Parameters
     ----------
     profile: pandas.Series
@@ -74,7 +74,7 @@ def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float 
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
-def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: float = 2.0) -> OptModel:
+def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: float = 2.0, converter_model="quadratic") -> OptModel:
     """
     Configures and creates a non-linear optimizer.
 
@@ -92,8 +92,14 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
     OptModel
         An instance of the configured optimizer.
     """
-    circuit = (260, 2)
-    converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 97}
+
+    if converter_model == "quadratic":
+        converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 97}
+        converter = QuadraticLossConverter(power=180e3, **converter_params)
+    elif converter_model == "constant":
+        converter = ConstantEfficiencyConverter(power=180e3, effc=0.97)
+    else:
+        raise NotImplementedError(f"Converter model '{converter_model}' not available.")
 
     nl_storage = NonLinearStorageModel(
         energy_capacity=180e3,
@@ -103,10 +109,9 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
             soh_r=soh_r,
             v_bounds=(2.7, 4.15),
             i_bounds=(2 * 94, 2 * 94),
-            circuit=circuit,
+            circuit=(260, 2),
         ),
-        converter_model=QuadraticLossConverter(power=180e3, **converter_params),
-        # converter_model=ConstantEfficiencyConverter(power=180e3, effc=0.97),
+        converter_model=converter,
     )
 
     solver = opt.SolverFactory("bonmin")
@@ -132,7 +137,7 @@ def optimizer_factory(model: str, profile: pd.Series, soh_r: float = 1.0, eff: f
     eff : float = 0.95
         Efficiency factor, relevant for the linear programming model.
 
-    
+
     Returns
     -------
     OptModel
@@ -158,8 +163,8 @@ def run_mpc(
     tqdm_options: dict | None = None,
 ) -> pd.DataFrame:
     """
-    Simulates a receding horizon MPC operation. Iteratively, every 15 min, the optimizer receives the system states and future prices to schedule the operation for the next horizon. 
-    The first 15 min of the schedule are passed to the system simulator which performs the 'real' dispatch and updates its state. 
+    Simulates a receding horizon MPC operation. Iteratively, every 15 min, the optimizer receives the system states and future prices to schedule the operation for the next horizon.
+    The first 15 min of the schedule are passed to the system simulator which performs the 'real' dispatch and updates its state.
 
     Parameters
     ----------

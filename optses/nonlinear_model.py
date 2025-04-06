@@ -27,7 +27,7 @@ class RintModel:
         soc_bounds: tuple[float, float] = (0.0, 1.0),
         soc_start: float = 0.5,
         soh_r: float = 1.0,
-        eff: float = 0.999,
+        eff: float = 0.9999,
     ) -> None:
         # circuit
         self._circuit = circuit
