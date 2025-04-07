@@ -1,4 +1,5 @@
 import pyomo.environ as opt
+import pyomo.dae as dae
 
 
 class NonLinearStorageModel:
@@ -71,8 +72,9 @@ class RintModel:
         def r(b):
             return b.r0 * b.soh_r
 
-        # vars
+        # vars + constraints
         block.soc = opt.Var(model.time, within=opt.UnitInterval, bounds=(block.soc_min, block.soc_max))
+        block.dsoc = dae.DerivativeVar(sVar=block.soc, wrt=model.time)
 
         (imax_c, imax_d) = self._i_bounds
         block.ic = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(0, imax_c * parallel))
@@ -81,25 +83,6 @@ class RintModel:
         @block.Expression(model.time)
         def i(b, t):
             return b.ic[t] - b.id[t]
-
-        # TODO: how to make a lookup table for the OCV-curve??
-        # (v_min, v_max) = self._v_bounds
-        # block.ocv = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(v_min * serial, v_max * serial))
-
-        # block.ocv_lookup = opt.Piecewise(
-        #     model.time, block.ocv, block.soc,
-        #     # pw_pts={t: self._ocv_lookup["soc"].to_list() for t in model.time},
-        #     pw_pts = self._ocv_lookup["soc"].to_list(),
-        #     # pw_pts = np.arange(0.0, 1.01, step=0.01).tolist(),
-        #     f_rule=(self._ocv_lookup["ocv"].to_numpy() * serial).tolist(),
-        #     # f_rule=f_ocv,
-        #     # f_rule = lambda m, t, x: np.interp(x, self._ocv_lookup["soc"], self._ocv_lookup["ocv"] * serial),
-        #     # f_rule = {self._ocv_lookup.loc[i, "soc"]: self._ocv_lookup.loc[i, "ocv"] * serial for i in range(len(self._ocv_lookup))},
-        #     pw_constr_type='EQ',
-        #     pw_repn="SOS2",
-        #     force_pw=True,
-        #     warning_tol=-0.1,
-        # )
 
         @block.Expression(model.time)
         def ocv(b, t):
@@ -127,12 +110,6 @@ class RintModel:
                 + k5 * b.soc[t]
             ) * serial
 
-        # TODO
-        # block.r_lookup = opt.Piecewise(model.soc, self._ocv_lookup["soc"], self._ocv_lookup["rint"] / parallel * serial)
-        # @block.Expression(model.time)
-        # def r(b, t):
-        #     return b.r_lookup[b.soc[t]]
-
         (v_min, v_max) = self._v_bounds
         block.v = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(v_min * serial, v_max * serial))
 
@@ -140,28 +117,18 @@ class RintModel:
         def v_constraint(b, t):
             return b.v[t] == b.ocv[t] + b.r * b.i[t]
 
-        # @block.Expression(model.time)
-        # def v(b, t):
-        #     return b.ocv[t] + b.r * b.i[t]
-
-        # constraints
-        @block.Constraint(model.time)
-        def soc_constraint(b, t):
-            if t == model.time.first():
-                return b.soc[t] == b.soc_start + model.dt * (b.ic[t] * b.effc - b.id[t] * (1 / b.effd)) / b.capacity
-            return b.soc[t] == b.soc[t - 1] + model.dt * (b.ic[t] * b.effc - b.id[t] * (1 / b.effd)) / b.capacity
-
         @block.Expression(model.time)
         def power_dc(b, t):
             return b.v[t] * b.i[t]
 
-        # @block.Constraint()
-        # def soc_end_constraint(b):
-        #     return b.soc[model.time.last()] >= b.soc_start
+        @block.Constraint(model.time)
+        def soc_constraint(b, t):
+            return b.dsoc[t] == (b.ic[t] * b.effc - b.id[t] / b.effd) / b.capacity
 
-        # @block.Expression()
-        # def fec(b):
-        #     return sum(b.ic[t] + b.id[t] for t in model.time) * model.dt / b.capacity / 2
+        @block.Constraint()
+        def initial_soc(b):
+            t = model.time.first()
+            return b.soc[t] == b.soc_start
 
 
 class QuadraticLossConverter:

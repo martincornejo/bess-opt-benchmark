@@ -1,4 +1,5 @@
 import pyomo.environ as opt
+import pyomo.dae as dae
 
 
 class LinearStorageModel:
@@ -35,8 +36,10 @@ class LinearStorageModel:
         block.effc = opt.Param(within=opt.PercentFraction, initialize=self._effc, mutable=True)
         block.effd = opt.Param(within=opt.PercentFraction, initialize=self._effd, mutable=True)
 
-        ## Variables
+        ## Variables + Constraints
         block.soc = opt.Var(model.time, bounds=(block.soc_min, block.soc_max))
+        block.dsoc = dae.DerivativeVar(sVar=block.soc, wrt=model.time)
+
         block.powerc = opt.Var(model.time, bounds=(0, block.max_power))
         block.powerd = opt.Var(model.time, bounds=(0, block.max_power))
 
@@ -44,17 +47,11 @@ class LinearStorageModel:
         def power(b, t):
             return b.powerc[t] - b.powerd[t]
 
-        # @block.Expression()
-        # def fec(b):
-        #     return sum(b.powerc[t] + b.powerd[t] for t in model.time) * model.dt / b.capacity / 2
-
-        ## Constraints
         @block.Constraint(model.time)
-        def soc_balance_constraint(b, t):
-            if t == model.time.first():
-                return b.soc[t] == b.soc_start + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
-            return b.soc[t] == b.soc[t - 1] + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
+        def soc_constraint(b, t):
+            return b.dsoc[t] == (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
 
-        # @block.Constraint()
-        # def soc_end_constraint(b):
-        #     return b.soc[model.time.last()] >= b.soc_start
+        @block.Constraint()
+        def initial_soc(b):
+            t = model.time.first()
+            return b.soc[t] == b.soc_start
