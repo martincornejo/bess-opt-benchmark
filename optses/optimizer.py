@@ -104,7 +104,7 @@ class OptModel:
         try:
             solution = self.solver.solve(self.model)
             status = solution.solver.termination_condition
-        except ValueError:
+        except (ValueError, RuntimeError):
             status = "error"  # should not be necessary, but pyomo errors anyway
 
         return status
