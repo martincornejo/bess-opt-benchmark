@@ -19,7 +19,6 @@ class RintModel:
     def __init__(
         self,
         capacity: float,
-        # ocv,  # DataFrame / dict
         r0: float,
         circuit: tuple[int, int],
         v_bounds: tuple[float, float],
@@ -34,7 +33,6 @@ class RintModel:
 
         # params
         self._capacity = capacity
-        # self._ocv_lookup = ocv
         self._r0 = r0
         self._v_bounds = v_bounds
         self._soc_bounds = soc_bounds
@@ -49,10 +47,8 @@ class RintModel:
     def build(self, block) -> None:
         model = block.model()
 
-        (serial, parallel) = self._circuit
-        # TODO: if the parameters are update, they will not account for the battery circuit
-
         # params
+        (serial, parallel) = self._circuit
         block.capacity = opt.Param(initialize=self._capacity * parallel, mutable=True)  # Ah * p
 
         (soc_min, soc_max) = self._soc_bounds
@@ -63,7 +59,6 @@ class RintModel:
         block.effc = opt.Param(within=opt.PercentFraction, initialize=self._eff)
         block.effd = opt.Param(within=opt.PercentFraction, initialize=self._eff)
 
-        # TODO: set as Piecewise
         block.r0 = opt.Param(initialize=self._r0 / parallel * serial)
         block.soh_r = opt.Param(initialize=self._soh_r, mutable=True)
 
@@ -82,28 +77,8 @@ class RintModel:
         def i(b, t):
             return b.ic[t] - b.id[t]
 
-        # TODO: how to make a lookup table for the OCV-curve??
-        # (v_min, v_max) = self._v_bounds
-        # block.ocv = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(v_min * serial, v_max * serial))
-
-        # block.ocv_lookup = opt.Piecewise(
-        #     model.time, block.ocv, block.soc,
-        #     # pw_pts={t: self._ocv_lookup["soc"].to_list() for t in model.time},
-        #     pw_pts = self._ocv_lookup["soc"].to_list(),
-        #     # pw_pts = np.arange(0.0, 1.01, step=0.01).tolist(),
-        #     f_rule=(self._ocv_lookup["ocv"].to_numpy() * serial).tolist(),
-        #     # f_rule=f_ocv,
-        #     # f_rule = lambda m, t, x: np.interp(x, self._ocv_lookup["soc"], self._ocv_lookup["ocv"] * serial),
-        #     # f_rule = {self._ocv_lookup.loc[i, "soc"]: self._ocv_lookup.loc[i, "ocv"] * serial for i in range(len(self._ocv_lookup))},
-        #     pw_constr_type='EQ',
-        #     pw_repn="SOS2",
-        #     force_pw=True,
-        #     warning_tol=-0.1,
-        # )
-
         @block.Expression(model.time)
         def ocv(b, t):
-            # Define the coefficients at index 2
             a1 = 3.3479
             a2 = -6.7241
             a3 = 2.5958
@@ -117,7 +92,6 @@ class RintModel:
             k4 = 0.3618
             k5 = 0.9949
 
-            # Calculate ocv for measured temperatures using the coefficients at index 2
             return (
                 k0
                 + k1 / (1 + opt.exp(a1 * (b.soc[t] - b1)))
@@ -127,22 +101,12 @@ class RintModel:
                 + k5 * b.soc[t]
             ) * serial
 
-        # TODO
-        # block.r_lookup = opt.Piecewise(model.soc, self._ocv_lookup["soc"], self._ocv_lookup["rint"] / parallel * serial)
-        # @block.Expression(model.time)
-        # def r(b, t):
-        #     return b.r_lookup[b.soc[t]]
-
         (v_min, v_max) = self._v_bounds
         block.v = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(v_min * serial, v_max * serial))
 
         @block.Constraint(model.time)
         def v_constraint(b, t):
             return b.v[t] == b.ocv[t] + b.r * b.i[t]
-
-        # @block.Expression(model.time)
-        # def v(b, t):
-        #     return b.ocv[t] + b.r * b.i[t]
 
         # constraints
         @block.Constraint(model.time)
@@ -155,13 +119,10 @@ class RintModel:
         def power_dc(b, t):
             return b.v[t] * b.i[t]
 
-        # @block.Constraint()
-        # def soc_end_constraint(b):
-        #     return b.soc[model.time.last()] >= b.soc_start
-
-        # @block.Expression()
-        # def fec(b):
-        #     return sum(b.ic[t] + b.id[t] for t in model.time) * model.dt / b.capacity / 2
+        @block.Constraint()
+        def power_end_constraint(b):
+            t = model.time.last()
+            return b.power_dc[t] == 0.0
 
 
 class QuadraticLossConverter:

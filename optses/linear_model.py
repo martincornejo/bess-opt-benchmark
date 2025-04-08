@@ -44,10 +44,6 @@ class LinearStorageModel:
         def power(b, t):
             return b.powerc[t] - b.powerd[t]
 
-        # @block.Expression()
-        # def fec(b):
-        #     return sum(b.powerc[t] + b.powerd[t] for t in model.time) * model.dt / b.capacity / 2
-
         ## Constraints
         @block.Constraint(model.time)
         def soc_balance_constraint(b, t):
@@ -55,6 +51,7 @@ class LinearStorageModel:
                 return b.soc[t] == b.soc_start + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
             return b.soc[t] == b.soc[t - 1] + model.dt * (b.powerc[t] * b.effc - b.powerd[t] / b.effd) / b.energy_capacity
 
-        # @block.Constraint()
-        # def soc_end_constraint(b):
-        #     return b.soc[model.time.last()] >= b.soc_start
+        @block.Constraint()
+        def power_end_constraint(b):
+            t = model.time.last()
+            return b.powerc[t] + b.powerd[t] == 0.0
