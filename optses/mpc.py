@@ -237,14 +237,14 @@ def run_mpc(
         if status == "optimal":
             res = optimizer.recover_results()
             power_opt_array = np.round(res["power"].iloc[0:steps].to_numpy())
-            soc_opt_array = res["soc"].iloc[0:steps].to_numpy()
+            soc_opt_array = res["soc"].iloc[1:(steps+1)].to_numpy()
             err_count = 0
         else:
             # if optimizer fails, take the continuation of the result of the previous iteration
             err_count += 1
             offset = steps * err_count
             power_opt_array = np.round(res["power"].iloc[offset : (offset + steps)].to_numpy())
-            soc_opt_array = res["soc"].iloc[offset : (offset + steps)].to_numpy()
+            soc_opt_array = res["soc"].iloc[(offset + 1) : (offset + steps + 1)].to_numpy()
 
         # simses - simulate the next 15 min
         for opt_step in range(steps):
