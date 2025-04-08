@@ -50,10 +50,8 @@ class RintModel:
     def build(self, block) -> None:
         model = block.model()
 
-        (serial, parallel) = self._circuit
-        # TODO: if the parameters are update, they will not account for the battery circuit
-
         # params
+        (serial, parallel) = self._circuit
         block.capacity = opt.Param(initialize=self._capacity * parallel, mutable=True)  # Ah * p
 
         (soc_min, soc_max) = self._soc_bounds
@@ -86,7 +84,6 @@ class RintModel:
 
         @block.Expression(model.time)
         def ocv(b, t):
-            # Define the coefficients at index 2
             a1 = 3.3479
             a2 = -6.7241
             a3 = 2.5958
@@ -100,7 +97,6 @@ class RintModel:
             k4 = 0.3618
             k5 = 0.9949
 
-            # Calculate ocv for measured temperatures using the coefficients at index 2
             return (
                 k0
                 + k1 / (1 + opt.exp(a1 * (b.soc[t] - b1)))
@@ -129,6 +125,11 @@ class RintModel:
         def initial_soc(b):
             t = model.time.first()
             return b.soc[t] == b.soc_start
+        
+        @block.Constraint()
+        def final_power(b):
+            t = model.time.last()
+            return b.power_dc[t] == 0.0
 
 
 class QuadraticLossConverter:

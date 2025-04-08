@@ -55,3 +55,8 @@ class LinearStorageModel:
         def initial_soc(b):
             t = model.time.first()
             return b.soc[t] == b.soc_start
+        
+        @block.Constraint()
+        def final_power(b):
+            t = model.time.last()
+            return b.powerc[t] + b.powerd[t] == 0.0
