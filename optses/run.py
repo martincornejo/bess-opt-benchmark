@@ -87,37 +87,42 @@ def run_parallel(scenarios: dict) -> None:
 ## scenarios
 def main():
     scenarios = {}
-
+    years = (2021,) # (2021, 2022)
+    fec = 1.5 # cycles per day
+    dt = 180 # opt timestep resolution (in seconds)
     horizon = 12  # h
-    for year in (2021, 2022):
-        model = "LP"
-        for fec in (1.5,):
-            for r in (1.0, 2.0, 3.0):
-                # for eff in (0.9, 0.95, 0.98):
-                eff = 0.95
-                scenarios[f"{year} {model} {fec=} {r=}"] = {
-                    "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                    "sim_params": {"start_soc": 0.0, "soh_r": r},
-                    "opt_params": {"model": model, "eff": eff, "max_fec": fec * (horizon / 24)},
-                    "horizon_hours": horizon,
-                    "timestep_sec": 900,  # 15 min
-                    "total_time": timedelta(weeks=2),
-                }
 
-        model = "NL"
-        for dt in (900, 300):
-            for fec in (1.5,):
-                for r in (1.0, 2.0, 3.0):
-                    # for r_opt in (1.0, 2.0, 3.0):
-                    r_opt = r
-                    scenarios[f"{year} {model} {fec=} {r=} {dt=}"] = {
+    for year in years: 
+        model = "LP"
+        for dt in (180, 60):
+            for r in (1.0, 2.0, 3.0):
+                for eff in (0.94, 0.95, 0.96):
+                # for eff in (0.92, 0.93, 0.94, 0.95, 0.96):
+                # for eff in (0.90, 0.89, 0.88, 0.87, 0.86, 0.85):
+                    scenarios[f"{year} {model} {fec=} {r=} {eff=} {dt=}"] = {
                         "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                         "sim_params": {"start_soc": 0.0, "soh_r": r},
-                        "opt_params": {"model": model, "soh_r": r_opt, "max_fec": fec * (horizon / 24)},
+                        "opt_params": {"model": model, "eff": eff, "max_fec": fec * (horizon / 24)},
                         "horizon_hours": horizon,
-                        "timestep_sec": dt,  # 15 min / 5 min
-                        "total_time": timedelta(weeks=2),
+                        "timestep_sec": dt,
+                        "total_time": timedelta(weeks=1),
                     }
+
+        # model = "NL"
+        # for dt in (180, 60):
+        #     for converter in ("constant",): # "quadratic"):
+        #         for r in (1.0, 2.0, 3.0):
+        #             # for r_opt in (0.8, 0.9, 1.0, 1.1, 1.2):
+        #             for r_opt in (0.8, 1.0, 1.2):
+        #             # for r_opt in (0.5, 0.7, 1.3, 1.5):
+        #                 scenarios[f"{year} {model} {fec=} {r=} {r_opt=} {dt=}"] = {
+        #                     "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+        #                     "sim_params": {"start_soc": 0.0, "soh_r": r},
+        #                     "opt_params": {"model": model, "converter_model": converter, "soh_r": r * r_opt, "max_fec": fec * (horizon / 24)},
+        #                     "horizon_hours": horizon,
+        #                     "timestep_sec": dt,
+        #                     "total_time": timedelta(weeks=1),
+        #                 }
 
     run_parallel(scenarios)
 
