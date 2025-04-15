@@ -51,7 +51,11 @@ def simses_factory(start_soc: float, soh_r: float = 1.0):
     return SinamicsS120Fit(max_power=180e3, storage=bat)
 
 
-def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float = 0.95) -> OptModel:
+def build_linear_optimizer(
+    profile: pd.Series,
+    max_fec: float = 2.0,
+    eff: float = 0.95,
+) -> OptModel:
     """
     Configures and creates a linear optimizer.
 
@@ -74,7 +78,13 @@ def build_linear_optimizer(profile: pd.Series, max_fec: float = 2.0, eff: float 
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
 
-def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: float = 2.0, converter_model="quadratic") -> OptModel:
+def build_non_linear_optimizer(
+    profile: pd.Series,
+    soh_r: float = 1.0,
+    max_fec: float = 2.0,
+    converter_model="constant",
+    eff=0.97,
+) -> OptModel:
     """
     Configures and creates a non-linear optimizer.
 
@@ -99,7 +109,7 @@ def build_non_linear_optimizer(profile: pd.Series, soh_r: float = 1.0, max_fec: 
         converter_params = {"k0": 0.00601144, "k1": 0.00863612, "k2": 0.01195589, "m0": 97}
         converter = QuadraticLossConverter(power=180e3, **converter_params)
     elif converter_model == "constant":
-        converter = ConstantEfficiencyConverter(power=180e3, effc=0.97)
+        converter = ConstantEfficiencyConverter(power=180e3, effc=eff)
     else:
         raise NotImplementedError(f"Converter model '{converter_model}' not available.")
 
