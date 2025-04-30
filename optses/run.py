@@ -48,7 +48,7 @@ def run_scenario(scenario, queue, lock) -> None:
         tqdm_options = {"position": slot, "mininterval": 1.0, "leave": False}
         df = run_mpc(name, tqdm_options=tqdm_options, **params)
         df.index.name = "time"
-        df.to_parquet(f"results/sens-full/{name}.parquet")
+        df.to_parquet(f"results/{name}.parquet")
 
         # log
         elapsed_time = time.time() - start_time
@@ -93,19 +93,19 @@ def main():
 
 
     for year in years: 
-        # model = "NL"
-        # converter = "constant"
-        # eff  = 0.973
-        # for r in (1.0, 2.0, 3.0):
-        #     for r_opt in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5):
-        #         scenarios[f"{year} {model} {r=} {r_opt=}"] = {
-        #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-        #             "sim_params": {"start_soc": 0.0, "soh_r": r},
-        #             "opt_params": {"model": model, "converter_model": converter, "eff": eff, "soh_r": r * r_opt, "max_fec": fec * (horizon / 24)},
-        #             "horizon_hours": horizon,
-        #             "timestep_sec": 60,
-        #             # "total_time": timedelta(weeks=2),
-        #         }
+        model = "NL"
+        converter = "constant"
+        eff  = 0.973
+        for r in (1.0, 2.0, 3.0):
+            for r_opt in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5):
+                scenarios[f"{year} {model} {r=} {r_opt=}"] = {
+                    "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+                    "sim_params": {"start_soc": 0.0, "soh_r": r},
+                    "opt_params": {"model": model, "converter_model": converter, "eff": eff, "soh_r": r * r_opt, "max_fec": fec * (horizon / 24)},
+                    "horizon_hours": horizon,
+                    "timestep_sec": 60,
+                    # "total_time": timedelta(weeks=4),
+                }
 
         model = "LP"
         for r in (1.0, 2.0, 3.0):
@@ -116,7 +116,7 @@ def main():
                     "opt_params": {"model": model, "eff": eff, "max_fec": fec * (horizon / 24)},
                     "horizon_hours": horizon,
                     "timestep_sec": 60,
-                    # "total_time": timedelta(weeks=2),
+                    # "total_time": timedelta(weeks=4),
                 }
 
     # files = os.listdir("results/sens/")
@@ -127,15 +127,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    scenario = {
-        "profile_file": f"data/intraday_prices/electricity_prices_germany_{2021}.csv",
-        "sim_params": {"start_soc": 0.0, "soh_r": 1.0},
-        "opt_params": {"model": "LP", "eff": 0.96, "max_fec": 1.5 * (12 / 24)},
-        "horizon_hours": 2,
-        "timestep_sec": 300,
-        # "start_dt": datetime(2021, 3, 27, 5, 0, 0),
-        # "total_time": timedelta(weeks=1, days=-1),
-    }
-    df = run_mpc("test", **scenario)
-    print(df)
+    main()

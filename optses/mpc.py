@@ -73,8 +73,7 @@ def build_linear_optimizer(
     OptModel
         An instance of the configured optimizer.
     """
-    # solver = opt.SolverFactory("appsi_highs")
-    solver = opt.SolverFactory("gurobi")
+    solver = opt.SolverFactory("appsi_highs")
     bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=eff)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
