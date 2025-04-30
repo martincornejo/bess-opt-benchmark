@@ -11,4 +11,5 @@ wheels/
 
 # simses
 results/
+figs/
 *.log
