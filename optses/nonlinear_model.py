@@ -77,8 +77,7 @@ class RintModel:
         def i(b, t):
             return b.ic[t] - b.id[t]
 
-        @block.Expression(model.time)
-        def ocv(b, t):
+        def ocv_curve(soc):
             a1 = 3.3479
             a2 = -6.7241
             a3 = 2.5958
@@ -94,12 +93,23 @@ class RintModel:
 
             return (
                 k0
-                + k1 / (1 + opt.exp(a1 * (b.soc[t] - b1)))
-                + k2 / (1 + opt.exp(a2 * (b.soc[t] - b2)))
-                + k3 / (1 + opt.exp(a3 * (b.soc[t] - 1)))
-                + k4 / (1 + opt.exp(a4 * b.soc[t]))
-                + k5 * b.soc[t]
-            ) * serial
+                + k1 / (1 + opt.exp(a1 * (soc - b1)))
+                + k2 / (1 + opt.exp(a2 * (soc - b2)))
+                + k3 / (1 + opt.exp(a3 * (soc - 1)))
+                + k4 / (1 + opt.exp(a4 * soc))
+                + k5 * soc
+            ) 
+
+        @block.Expression(model.time)
+        def ocv(b, t):
+            # if t == model.time.first():
+            #     soc = (b.soc[t] + b.soc_start) / 2
+            #     # soc = b.soc_start
+            # else:
+            #     soc = (b.soc[t] + b.soc[t - 1]) / 2
+            #     # soc = b.soc[t - 1]
+            soc = b.soc[t]
+            return ocv_curve(soc) * serial
 
         (v_min, v_max) = self._v_bounds
         block.v = opt.Var(model.time, within=opt.NonNegativeReals, bounds=(v_min * serial, v_max * serial))

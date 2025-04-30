@@ -3,7 +3,7 @@ import time
 import logging
 import multiprocessing
 from functools import partial
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -48,7 +48,7 @@ def run_scenario(scenario, queue, lock) -> None:
         tqdm_options = {"position": slot, "mininterval": 1.0, "leave": False}
         df = run_mpc(name, tqdm_options=tqdm_options, **params)
         df.index.name = "time"
-        df.to_parquet(f"results/{name}.parquet")
+        df.to_parquet(f"results/sens-full/{name}.parquet")
 
         # log
         elapsed_time = time.time() - start_time
@@ -89,43 +89,53 @@ def main():
     scenarios = {}
     years = (2021,) # (2021, 2022)
     fec = 1.5 # cycles per day
-    dt = 180 # opt timestep resolution (in seconds)
     horizon = 12  # h
 
-    for year in years: 
-        model = "LP"
-        for dt in (180, 60):
-            for r in (1.0, 2.0, 3.0):
-                for eff in (0.94, 0.95, 0.96):
-                # for eff in (0.92, 0.93, 0.94, 0.95, 0.96):
-                # for eff in (0.90, 0.89, 0.88, 0.87, 0.86, 0.85):
-                    scenarios[f"{year} {model} {fec=} {r=} {eff=} {dt=}"] = {
-                        "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-                        "sim_params": {"start_soc": 0.0, "soh_r": r},
-                        "opt_params": {"model": model, "eff": eff, "max_fec": fec * (horizon / 24)},
-                        "horizon_hours": horizon,
-                        "timestep_sec": dt,
-                        "total_time": timedelta(weeks=1),
-                    }
 
+    for year in years: 
         # model = "NL"
-        # for dt in (180, 60):
-        #     for converter in ("constant",): # "quadratic"):
-        #         for r in (1.0, 2.0, 3.0):
-        #             # for r_opt in (0.8, 0.9, 1.0, 1.1, 1.2):
-        #             for r_opt in (0.8, 1.0, 1.2):
-        #             # for r_opt in (0.5, 0.7, 1.3, 1.5):
-        #                 scenarios[f"{year} {model} {fec=} {r=} {r_opt=} {dt=}"] = {
-        #                     "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
-        #                     "sim_params": {"start_soc": 0.0, "soh_r": r},
-        #                     "opt_params": {"model": model, "converter_model": converter, "soh_r": r * r_opt, "max_fec": fec * (horizon / 24)},
-        #                     "horizon_hours": horizon,
-        #                     "timestep_sec": dt,
-        #                     "total_time": timedelta(weeks=1),
-        #                 }
+        # converter = "constant"
+        # eff  = 0.973
+        # for r in (1.0, 2.0, 3.0):
+        #     for r_opt in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5):
+        #         scenarios[f"{year} {model} {r=} {r_opt=}"] = {
+        #             "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+        #             "sim_params": {"start_soc": 0.0, "soh_r": r},
+        #             "opt_params": {"model": model, "converter_model": converter, "eff": eff, "soh_r": r * r_opt, "max_fec": fec * (horizon / 24)},
+        #             "horizon_hours": horizon,
+        #             "timestep_sec": 60,
+        #             # "total_time": timedelta(weeks=2),
+        #         }
+
+        model = "LP"
+        for r in (1.0, 2.0, 3.0):
+            for eff in (0.90, 0.91, 0.92, 0.93, 0.936, 0.94, 0.948, 0.95, 0.955, 0.96, 0.97):
+                scenarios[f"{year} {model} {r=} {eff=}"] = {
+                    "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
+                    "sim_params": {"start_soc": 0.0, "soh_r": r},
+                    "opt_params": {"model": model, "eff": eff, "max_fec": fec * (horizon / 24)},
+                    "horizon_hours": horizon,
+                    "timestep_sec": 60,
+                    # "total_time": timedelta(weeks=2),
+                }
+
+    # files = os.listdir("results/sens/")
+    # ids = [os.path.splitext(file)[0] for file in files]
+    # scenarios = {key: value for key, value in scenarios.items() if key not in ids}
 
     run_parallel(scenarios)
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    scenario = {
+        "profile_file": f"data/intraday_prices/electricity_prices_germany_{2021}.csv",
+        "sim_params": {"start_soc": 0.0, "soh_r": 1.0},
+        "opt_params": {"model": "LP", "eff": 0.96, "max_fec": 1.5 * (12 / 24)},
+        "horizon_hours": 2,
+        "timestep_sec": 300,
+        # "start_dt": datetime(2021, 3, 27, 5, 0, 0),
+        # "total_time": timedelta(weeks=1, days=-1),
+    }
+    df = run_mpc("test", **scenario)
+    print(df)

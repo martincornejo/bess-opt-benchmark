@@ -73,7 +73,8 @@ def build_linear_optimizer(
     OptModel
         An instance of the configured optimizer.
     """
-    solver = opt.SolverFactory("appsi_highs")
+    # solver = opt.SolverFactory("appsi_highs")
+    solver = opt.SolverFactory("gurobi")
     bess = LinearStorageModel(energy_capacity=180e3, power=180e3, effc=eff)
     return OptModel(solver=solver, storage_model=bess, profile=profile, max_period_fec=max_fec)
 
@@ -168,6 +169,7 @@ def run_mpc(
     horizon_hours: int = 12,
     timestep_sec: int = 900,
     total_time: timedelta | None = None,
+    start_dt: datetime | None = None,
     tqdm_options: dict | None = None,
 ) -> pd.DataFrame:
     """
@@ -209,7 +211,8 @@ def run_mpc(
     ## Price timeseries
     profile = load_price_timeseries(profile_file)
     profile = profile.resample(timestep_dt).ffill()
-    start_dt: datetime = profile.index[0]
+    if start_dt is None:
+        start_dt: datetime = profile.index[0]
     if total_time is not None:
         profile = profile.loc[start_dt : (start_dt + total_time)]
     end_dt: datetime = profile.index[-1]
@@ -230,8 +233,14 @@ def run_mpc(
     err_count = 0
 
     # MPC loop
+    t_opt_reset = pd.date_range(start=start_dt, end=end_dt, freq=timedelta(weeks=2))
     timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
     for t in tqdm(timesteps, desc=name, **tqdm_options):
+        if t in t_opt_reset:
+            # re-instantiate the optimizer every month of simulation
+            # this is due to a bug in pyomo
+            optimizer = optimizer_factory(profile=profile.loc[start_dt : (start_dt + horizon)], **opt_params)
+
         # optses - solve optimal schedule
         timerange = pd.date_range(start=t, end=t + horizon, freq=timestep_dt)
         params = {
