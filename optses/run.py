@@ -109,7 +109,7 @@ def main():
 
         model = "LP"
         for r in (1.0, 2.0, 3.0):
-            for eff in (0.90, 0.91, 0.92, 0.93, 0.936, 0.94, 0.948, 0.95, 0.955, 0.96, 0.97):
+            for eff in (0.90, 0.91, 0.92, 0.933, 0.94, 0.946, 0.95, 0.955, 0.959, 0.97):
                 scenarios[f"{year} {model} {r=} {eff=}"] = {
                     "profile_file": f"data/intraday_prices/electricity_prices_germany_{year}.csv",
                     "sim_params": {"start_soc": 0.0, "soh_r": r},

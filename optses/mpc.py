@@ -117,7 +117,7 @@ def build_non_linear_optimizer(
         energy_capacity=180e3,
         battery_model=RintModel(
             capacity=94,
-            r0=0.75e-3,
+            r0=0.819e-3,
             soh_r=soh_r,
             v_bounds=(2.7, 4.15),
             i_bounds=(2 * 94, 2 * 94),
