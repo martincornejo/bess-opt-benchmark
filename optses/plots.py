@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib.patches import PathPatch
+from matplotlib.path import Path
 
 Esys = 180e3  # Wh
 Psys = 180e3  # W
@@ -138,22 +140,36 @@ def plot_benchmark(df_lp, df_nl):
 
 
 def plot_power_ecdf(res_lp, res_nl):
-    fig, ax = plt.subplots(figsize=(4.5, 3.5))
-    
+    fig, ax = plt.subplots(figsize=(4.5, 2.5))
+    ax2 = fig.add_axes([0.61, 0.21, 0.25, 0.45])
+
+    codes = [Path.MOVETO] + [Path.LINETO]*3 + [Path.CLOSEPOLY]
+    vertices = [(-0.04, 0.81), (-0.04, 1.0), (1.04, 1.0), (1.04, 0.81), (0, 0)]
+    path = Path(vertices, codes)
+    pathpatch = PathPatch(path, facecolor="none", edgecolor="gray", linestyle="--")
+    ax.add_patch(pathpatch)
+
     r_values = (1.0, 2.0, 3.0)
     for (i, r) in enumerate(r_values):
         df_lp = res_lp[r] / Psys
         ax.ecdf(df_lp["power_sim"], color=colors(2-i), label=fr"LP - $SOH_R = {i+1}$")
+        ax2.ecdf(df_lp["power_sim"], color=colors(2-i), label=fr"LP - $SOH_R = {i+1}$")
 
     for (i, r) in enumerate(r_values):
         df_nl = res_nl[r] / Psys
         ax.ecdf(df_nl["power_sim"], color=colors(6-i), label=fr"NL - $SOH_R = {i+1}$")
+        ax2.ecdf(df_nl["power_sim"], color=colors(6-i), label=fr"NL - $SOH_R = {i+1}$")
     
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax.set_xlabel("Power / %")
     ax.set_ylabel("Cumulative frequency / %")
     ax.legend(loc="upper left")
+
+    ax2.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
+    ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
+    ax2.set_ylim(0.81, 1.0)
+    ax2.set_xlim(-0.05, 1.05)
 
     return fig 
 
