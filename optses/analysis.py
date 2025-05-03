@@ -1,77 +1,96 @@
-import matplotlib.pyplot as plt
+import re
 import pandas as pd
-import numpy as np
+
+def extract_value(string: str, key: str) -> float:
+    "Extract parameter from simulation ID"
+    match = re.search(fr"{key}=([\d.]+)", string)
+    if match:
+        value = match.group(1)
+    return float(value)
+
+def calc_fec(df: pd.DataFrame) -> float:
+    "Full equivalent cycles (FEC) perfomed by the storage system"
+    power = df["power_sim"]
+    power_pos = power[power > 0].sum() * (1 / 60)
+    power_neg = power[power < 0].abs().sum() * (1 / 60)
+    return (power_pos + power_neg) / 2 / 180e3
+
+def calc_rte(df: pd.DataFrame) -> float:
+    "Roundtrip efficiency"
+    p = df["power_sim"]
+    e_pos = p[p > 0].abs().sum() * (1 / 60)  # Wh
+    e_neg = p[p < 0].abs().sum() * (1 / 60)  # Wh
+
+    delta_soc = df["soc_sim"].iloc[-1] - df["soc_sim"].iloc[0]
+    delta_e = delta_soc * 180e3  # Wh
+
+    return abs(e_neg) / (e_pos - delta_e)
+
+def calc_revenue(df: pd.DataFrame, price: pd.Series) -> float:
+    "Total revenue from trading in €"
+    price = price.resample("1Min").ffill()
+    df = df.join(price)
+    return -1 * sum(df["power_sim"] * df["Intraday Continuous 15 minutes ID1-Price"]) * (1/60) * 1e-6  # W -> MWh
+
+def calc_imbalance_pos(df: pd.DataFrame) -> float:
+    df["imb"] = -(df["power_opt"] - df["power_sim"]) * (1 / 60) #* 1e-6 # MWh
+    # negation since positive power is charging
+    return df.loc[df.imb > 0, "imb"].sum() # BESS under-supply
+
+def calc_imbalance_neg(df: pd.DataFrame) -> float:
+    df["imb"] = -(df["power_opt"] - df["power_sim"]) * (1 / 60) #* 1e-6 # MWh
+    # negation since positive power is charging
+    return df.loc[df.imb < 0, "imb"].sum() # BESS over-supply
+
+def calc_loss_batt(df: pd.DataFrame) -> float:
+    power_out = df[df["power_sim"] < 0]["power_sim"].abs().sum()
+    loss_batt = df["battery_losses"].sum()
+    loss_conv = df["converter_losses"].sum()
+    loss_total = loss_batt + loss_conv
+    return loss_batt / (power_out + loss_total)
+
+def calc_loss_conv(df: pd.DataFrame) -> float:
+    power_out = df[df["power_sim"] < 0]["power_sim"].abs().sum()
+    loss_batt = df["battery_losses"].sum()
+    loss_conv = df["converter_losses"].sum()
+    loss_total = loss_batt + loss_conv
+    return loss_conv / (power_out + loss_total)
+
+def analyze_results_lp(res: dict[str, pd.DataFrame], price: pd.Series) -> pd.DataFrame:
+    out = pd.DataFrame()
+    for (id, df) in res.items():
+        if "LP" in id:
+            data = dict(
+                r = extract_value(id, "r"),
+                eff = extract_value(id, "eff"),
+                rev = calc_revenue(df, price),
+                fec = calc_fec(df),
+                rte = calc_rte(df),
+                loss_batt = calc_loss_batt(df),
+                loss_conv = calc_loss_conv(df),
+                imb_under = calc_imbalance_pos(df),
+                imb_over = calc_imbalance_neg(df),
+            )
+            out = pd.concat([out, pd.DataFrame(data=[data])])
+
+    return out
 
 
-def calc_fec(res):
-    return res["soc_sim"].diff().abs().sum() / 2
+def analyze_results_nl(res: dict[str, pd.DataFrame], price: pd.Series) -> pd.DataFrame:
+    out = pd.DataFrame()
+    for (id, df) in res.items():
+        if ("NL" in id):
+            data = dict(
+                r = extract_value(id, "r"),
+                r_opt = extract_value(id, "r_opt"),
+                rev = calc_revenue(df, price),
+                fec = calc_fec(df),
+                rte = calc_rte(df),
+                loss_batt = calc_loss_batt(df),
+                loss_conv = calc_loss_conv(df),
+                imb_under = calc_imbalance_pos(df),
+                imb_over = calc_imbalance_neg(df),
+            )
+            out = pd.concat([out, pd.DataFrame(data=[data])])
 
-
-def calc_roundtrip_efficiency(res):
-    p = res["power_sim"]
-    e_pos = p[p > 0].sum() * 0.25  # Wh
-    e_neg = p[p < 0].sum() * 0.25  # Wh
-
-    delta_soc = res["soc_sim"].iloc[-1] - res["soc_sim"].iloc[0]
-    delta_e = delta_soc * 66e3  # Wh
-
-    return np.abs(e_neg) / (e_pos - delta_e)
-
-
-def calc_revenue(res, price):
-    df = res.join(price)
-    return -1 * sum(df["power_sim"] * df["Intraday Continuous 15 minutes ID1-Price"]) * 0.25 * 1e-6  # W -> MWh
-
-
-def summary_results(results, price):
-    df = pd.DataFrame()
-    for name, res in results.items():
-        data = {"name": name, "FEC": calc_fec(res), "Eff": calc_roundtrip_efficiency(res), "Rev": calc_revenue(res, price)}
-        df = pd.concat([df, pd.DataFrame(data=[data])])
-    return df
-
-
-def print_performance(name, res, price):
-    print(f"-- {name} --")
-    fec = calc_fec(res)
-    eff = calc_roundtrip_efficiency(res)
-    rev = calc_revenue(res, price)
-    print(f"Full equivalent cycles: {fec:.1f}")
-    print(f"Roundtrip efficiency: {eff:.2%}")
-    print(f"Revenue: {rev:.2f}€")
-    print("")
-
-
-def plot_trading_power(res, price):
-    fig, ax = plt.subplots(2, 2, height_ratios=[1, 3], width_ratios=[3, 1])
-
-    df = res.join(price)
-    power = df["power_sim"] / 100e3
-    price = df["Intraday Continuous 15 minutes ID1-Price"]
-
-    idx = power > 0
-    # ax.scatter(price.loc[idx], power.loc[idx])
-    ax[1, 0].scatter(power.loc[idx], price.loc[idx], alpha=0.5)
-    ax[0, 0].hist(power.loc[idx], alpha=0.5, label="Charge")
-    ax[1, 1].hist(price.loc[idx], orientation="horizontal", alpha=0.5)
-
-    idx = power < 0
-    # ax.scatter(price.loc[idx], power.loc[idx])
-    ax[1, 0].scatter(power.loc[idx], price.loc[idx], alpha=0.5)
-    ax[0, 0].hist(power.loc[idx], alpha=0.5, label="Discharge")
-    ax[1, 1].hist(price.loc[idx], orientation="horizontal", alpha=0.5)
-
-    ax[0, 1].set_visible(False)
-    ax[0, 0].xaxis.set_visible(False)
-    ax[1, 1].yaxis.set_visible(False)
-
-    # ax[0,0].set_ylabel("Hist")
-    # ax[1,1].set_xlabel("Hist")
-    ax[1, 0].set_xlabel("Power in p.u.")
-    ax[1, 0].set_ylabel("Price in €/MWh")
-
-    fig.tight_layout(h_pad=0.1, w_pad=0.5)
-
-    fig.legend(loc="center", bbox_to_anchor=(0.87, 0.85))
-
-    return fig
+    return out
