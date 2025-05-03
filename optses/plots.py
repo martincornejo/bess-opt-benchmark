@@ -1,16 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from matplotlib.ticker import FuncFormatter
 
 Esys = 180e3  # Wh
 Psys = 180e3  # W
 
 colors = plt.cm.tab20c
-cm_blues = plt.get_cmap("Blues")
-cm_oranges = plt.get_cmap("Oranges")
 
-
+## benchmark
 def plot_eff_rev(df_lp, df_nl):
     fig, ax = plt.subplots()
     max_rev = 1  # max(df_lp["rev"].max(), df_nl["rev"].max())
@@ -50,7 +47,7 @@ def plot_rev_bar(ax, df_lp, df_nl) -> None:
     ax.set_ylim(51000, 63000)
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
-    ax.set_xlabel("SOH-R")
+    ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Revenue / € / MW")
     ax.legend(title="Model")
 
@@ -91,7 +88,7 @@ def plot_eff_bar(ax, df_lp, df_nl) -> None:
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
-    ax.set_xlabel("SOH-R")
+    ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Realative losses / %")
     ax.legend(ncol=2, loc="lower center", framealpha=1.0)
 
@@ -123,7 +120,7 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     ax.set_ylim(0, 13500)
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
-    ax.set_xlabel("SOH-R")
+    ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Imbalance energy / kWh")
     ax.legend()
 
@@ -161,7 +158,79 @@ def plot_power_ecdf(res_lp, res_nl):
     return fig 
 
 
+## sensitivity analysis
+def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
+    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 4.5))
 
+    r_values = sorted(df_lp["r"].unique())
+
+    for (i, r) in enumerate(r_values):
+        ## LP
+        # basis scenario
+        df_lp0_ = df_lp0[df_lp0.r == r]
+        rev_lp0 = df_lp0_["rev"].iloc[0]
+        imb_lp0 = (df_lp0_["imb_under"] + df_lp0_["imb_over"].abs())
+        
+        # sensitivity
+        df_lp_ = df_lp[df_lp.r == r]
+        df_lp_ = df_lp_.sort_values(by="eff")
+        eff = df_lp_["eff"]
+        imb_total_lp = (df_lp_["imb_under"] + df_lp_["imb_over"].abs()) / imb_lp0 - 1
+        rev_lp = df_lp_["rev"] / rev_lp0 - 1
+        
+        ## NL
+        # basis scenario
+        df_nl0_ = df_nl0[df_nl0.r == r]
+        rev_nl0 = df_nl0_["rev"].iloc[0]
+        imb_nl0 = (df_nl0_["imb_under"] + df_nl0_["imb_over"].abs())
+
+        # sensitivity
+        df_nl_ = df_nl[df_nl.r == r]
+        df_nl_ = df_nl_.sort_values(by="r_opt")
+        r_opt = df_nl_["r_opt"] - 1
+        imb_total_nl = (df_nl_["imb_under"] + df_nl_["imb_over"].abs()) / imb_nl0 - 1
+        rev_nl = df_nl_["rev"] / rev_nl0 - 1
+
+        ax[0,0].plot(eff, rev_lp, marker="o", color=colors(2-i), label=fr"LP - $SOH_R = {i +1}$")
+        ax[0,1].plot(r_opt, rev_nl, marker="o", color=colors(6-i), label=fr"NL - $SOH_R = {i +1}$")
+        ax[1,0].plot(eff, imb_total_lp, marker="o", color=colors(2-i))
+        ax[1,1].plot(r_opt, imb_total_nl, marker="o", color=colors(6-i))
+
+    for i in range(2):
+        ax[0, i].set_ylabel(r"$\Delta$Revenue / %") 
+        ax[0, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+        ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+
+    for i in range(2):
+        ax[1, i].set_ylabel(r"$\Delta E_{imb}$ / %")
+        ax[1, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+        ax[1, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
+
+    ax[0, 0].set_xlabel(r"$\eta$ / %")
+    ax[1, 0].set_xlabel(r"$\eta$ / %")
+    ax[0, 1].set_xlabel(r"$\Delta SOH_R$ / %")
+    ax[1, 1].set_xlabel(r"$\Delta SOH_R$ / %")
+
+    ax[0,0].set_ylim(-0.02, 0.005)
+    ax[0,1].set_ylim(-0.02, 0.005)
+
+    # second column has y-axis pointing right
+    ax[1,1].yaxis.set_label_position("right")
+    ax[1,1].yaxis.tick_right()    
+    ax[0,1].yaxis.set_label_position("right")
+    ax[0,1].yaxis.tick_right() 
+
+    fig.legend(loc="lower center", ncols=2, bbox_to_anchor=(0.5, -0.2))
+    fig.tight_layout()
+
+    ax[0, 0].set_title("a)", fontweight="bold", loc="left")
+    ax[0, 1].set_title("b)", fontweight="bold", loc="left")
+    ax[1, 0].set_title("c)", fontweight="bold", loc="left")
+    ax[1, 1].set_title("d)", fontweight="bold", loc="left")
+    return fig
+
+
+## timeseries
 def plot_timeseries(df, **kwargs):
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(10, 8))
 
