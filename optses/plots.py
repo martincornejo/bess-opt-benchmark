@@ -9,16 +9,17 @@ Psys = 180e3  # W
 
 colors = plt.cm.tab20c
 
+
 ## benchmark
 def plot_eff_rev(df_lp, df_nl):
     fig, ax = plt.subplots()
     max_rev = max(df_lp["rev"].max(), df_nl["rev"].max())
-    
+
     # linear regression
-    rte = np.concatenate((df_lp["rte"], df_nl["rte"])) 
+    rte = np.concatenate((df_lp["rte"], df_nl["rte"]))
     rev = np.concatenate((df_lp["rev"], df_nl["rev"])) / max_rev
     slope, intercept = np.polyfit(rte, rev, 1)
-    r = np.corrcoef(rte, rev)[0,1]
+    r = np.corrcoef(rte, rev)[0, 1]
     print(f"{slope=:.2f}")
     print(f"{r=:.3f}")
 
@@ -55,17 +56,18 @@ def plot_rev_bar(ax, df_lp, df_nl) -> None:
             f"{improvement:+.1%}",
             xy=(x[i] - bar_width / 2, lp_rev[i]),
             xytext=(x[i] + bar_width / 2, nl_rev[i]),
-            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.3 - i * 0.3}", color="black"),
+            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.3 - i * 0.25}", color="black"),
             ha="center",
             va="bottom",
         )
 
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:,.0f}"))
     ax.set_ylim(51000, 63000)
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Revenue / € / MW")
-    ax.legend(title="Model")
+    ax.legend(title="Model", fontsize="small", frameon=False)
 
 
 def plot_eff_bar(ax, df_lp, df_nl) -> None:
@@ -83,10 +85,10 @@ def plot_eff_bar(ax, df_lp, df_nl) -> None:
     nl_loss_conv = df_nl["loss_conv"].to_numpy()
     nl_loss_total = nl_loss_batt + nl_loss_conv
 
-    ax.bar(x - bar_width / 2, lp_loss_conv, width=bar_width, label="LP - Converter", color=colors(0))
-    ax.bar(x - bar_width / 2, lp_loss_batt, bottom=lp_loss_conv, width=bar_width, label="LP - Battery", color=colors(1))
-    ax.bar(x + bar_width / 2, nl_loss_conv, width=bar_width, label="NL - Converter", color=colors(4))
-    ax.bar(x + bar_width / 2, nl_loss_batt, bottom=nl_loss_conv, width=bar_width, label="NL - Battery", color=colors(6))
+    ax.bar(x - bar_width / 2, lp_loss_conv, width=bar_width, label="LP - converter", color=colors(0))
+    ax.bar(x - bar_width / 2, lp_loss_batt, bottom=lp_loss_conv, width=bar_width, label="LP - battery", color=colors(1))
+    ax.bar(x + bar_width / 2, nl_loss_conv, width=bar_width, label="NL - converter", color=colors(4))
+    ax.bar(x + bar_width / 2, nl_loss_batt, bottom=nl_loss_conv, width=bar_width, label="NL - battery", color=colors(6))
 
     for i in range(len(r_values)):
         improvement = nl_loss_total[i] - lp_loss_total[i]
@@ -99,14 +101,16 @@ def plot_eff_bar(ax, df_lp, df_nl) -> None:
             va="bottom",
         )
 
-    # ax.set_ylim(0, 0.176)
+    ax.set_ylim(0, 0.2)
     ax.set_yticks(np.arange(0, 0.2, 0.025))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Realative losses / %")
-    ax.legend(ncol=2, loc="lower center", framealpha=1.0)
+    # ax.legend(ncol=2, loc="lower center", framealpha=1.0, fontsize="small")
+    legend = ax.legend(ncol=2, loc="upper left", fontsize="small", columnspacing=1.0, frameon=False)
+    legend.set_zorder(0)
 
 
 def plot_imb_bar(ax, df_lp, df_nl) -> None:
@@ -133,59 +137,61 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
         ax.text(x[i] - bar_width / 2, lp_total[i] + 0.01, f"{lp_total[i]:.0f} kWh", ha="center", va="bottom")
         ax.text(x[i] + bar_width / 2 + 0.08, nl_total[i] + 0.01, f"{nl_total[i]:.0f} kWh", ha="center", va="bottom")
 
-    ax.set_ylim(0, 13500)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:,.0f}"))
+    ax.set_ylim(0, 14000)
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
     ax.set_ylabel("Imbalance energy / kWh")
-    ax.legend()
+    legend = ax.legend(fontsize="small", frameon=False)
+    legend.set_zorder(2)
 
 
 def plot_benchmark(df_lp, df_nl):
-    fig, ax = plt.subplots(nrows=3, figsize=(4.5, 3 * 3.5))
+    fig, ax = plt.subplots(nrows=3, figsize=(4.5, 3 * 2.6))
     plot_rev_bar(ax[0], df_lp, df_nl)
     plot_eff_bar(ax[1], df_lp, df_nl)
     plot_imb_bar(ax[2], df_lp, df_nl)
+    fig.tight_layout()
     ax[0].set_title("a)", fontweight="bold", loc="left")
     ax[1].set_title("b)", fontweight="bold", loc="left")
     ax[2].set_title("c)", fontweight="bold", loc="left")
-    # fig.tight_layout()
     return fig
 
 
 def plot_power_ecdf(res_lp, res_nl):
-    fig, ax = plt.subplots(figsize=(4.5, 2.5))
+    fig, ax = plt.subplots(figsize=(4.5, 2.3))
     ax2 = fig.add_axes([0.61, 0.21, 0.25, 0.45])
 
-    codes = [Path.MOVETO] + [Path.LINETO]*3 + [Path.CLOSEPOLY]
+    codes = [Path.MOVETO] + [Path.LINETO] * 3 + [Path.CLOSEPOLY]
     vertices = [(-0.04, 0.81), (-0.04, 1.0), (1.04, 1.0), (1.04, 0.81), (0, 0)]
     path = Path(vertices, codes)
     pathpatch = PathPatch(path, facecolor="none", edgecolor="gray", linestyle="--")
     ax.add_patch(pathpatch)
 
     r_values = (1.0, 2.0, 3.0)
-    for (i, r) in enumerate(r_values):
+    for i, r in enumerate(r_values):
         df_lp = res_lp[r] / Psys
-        ax.ecdf(df_lp["power_sim"], color=colors(2-i), label=fr"LP - $SOH_R = {i+1}$")
-        ax2.ecdf(df_lp["power_sim"], color=colors(2-i), label=fr"LP - $SOH_R = {i+1}$")
+        ax.ecdf(df_lp["power_sim"], color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
+        ax2.ecdf(df_lp["power_sim"], color=colors(2 - i))
 
-    for (i, r) in enumerate(r_values):
+    for i, r in enumerate(r_values):
         df_nl = res_nl[r] / Psys
-        ax.ecdf(df_nl["power_sim"], color=colors(6-i), label=fr"NL - $SOH_R = {i+1}$")
-        ax2.ecdf(df_nl["power_sim"], color=colors(6-i), label=fr"NL - $SOH_R = {i+1}$")
-    
+        ax.ecdf(df_nl["power_sim"], color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
+        ax2.ecdf(df_nl["power_sim"], color=colors(6 - i))
+
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax.set_xlabel("Power / %")
     ax.set_ylabel("Cumulative frequency / %")
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", fontsize="small", frameon=False)
 
     ax2.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.0f}"))
     ax2.set_ylim(0.81, 1.0)
     ax2.set_xlim(-0.05, 1.05)
 
-    return fig 
+    return fig
 
 
 ## sensitivity analysis
@@ -194,25 +200,25 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
 
     r_values = sorted(df_lp["r"].unique())
 
-    for (i, r) in enumerate(r_values):
+    for i, r in enumerate(r_values):
         ## LP
         # basis scenario
         df_lp0_ = df_lp0[df_lp0.r == r]
         rev_lp0 = df_lp0_["rev"].iloc[0]
-        imb_lp0 = (df_lp0_["imb_under"] + df_lp0_["imb_over"].abs())
-        
+        imb_lp0 = df_lp0_["imb_under"] + df_lp0_["imb_over"].abs()
+
         # sensitivity
         df_lp_ = df_lp[df_lp.r == r]
         df_lp_ = df_lp_.sort_values(by="eff")
         eff = df_lp_["eff"]
         imb_total_lp = (df_lp_["imb_under"] + df_lp_["imb_over"].abs()) / imb_lp0 - 1
         rev_lp = df_lp_["rev"] / rev_lp0 - 1
-        
+
         ## NL
         # basis scenario
         df_nl0_ = df_nl0[df_nl0.r == r]
         rev_nl0 = df_nl0_["rev"].iloc[0]
-        imb_nl0 = (df_nl0_["imb_under"] + df_nl0_["imb_over"].abs())
+        imb_nl0 = df_nl0_["imb_under"] + df_nl0_["imb_over"].abs()
 
         # sensitivity
         df_nl_ = df_nl[df_nl.r == r]
@@ -221,13 +227,13 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         imb_total_nl = (df_nl_["imb_under"] + df_nl_["imb_over"].abs()) / imb_nl0 - 1
         rev_nl = df_nl_["rev"] / rev_nl0 - 1
 
-        ax[0,0].plot(eff, rev_lp, marker="o", color=colors(2-i), label=fr"LP - $SOH_R = {i +1}$")
-        ax[0,1].plot(r_opt, rev_nl, marker="o", color=colors(6-i), label=fr"NL - $SOH_R = {i +1}$")
-        ax[1,0].plot(eff, imb_total_lp, marker="o", color=colors(2-i))
-        ax[1,1].plot(r_opt, imb_total_nl, marker="o", color=colors(6-i))
+        ax[0, 0].plot(eff, rev_lp, marker="o", color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
+        ax[0, 1].plot(r_opt, rev_nl, marker="o", color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
+        ax[1, 0].plot(eff, imb_total_lp, marker="o", color=colors(2 - i))
+        ax[1, 1].plot(r_opt, imb_total_nl, marker="o", color=colors(6 - i))
 
     for i in range(2):
-        ax[0, i].set_ylabel(r"$\Delta$Revenue / %") 
+        ax[0, i].set_ylabel(r"$\Delta$Revenue / %")
         ax[0, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
 
@@ -241,14 +247,14 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
     ax[0, 1].set_xlabel(r"$\Delta SOH_R$ / %")
     ax[1, 1].set_xlabel(r"$\Delta SOH_R$ / %")
 
-    ax[0,0].set_ylim(-0.02, 0.005)
-    ax[0,1].set_ylim(-0.02, 0.005)
+    ax[0, 0].set_ylim(-0.02, 0.005)
+    ax[0, 1].set_ylim(-0.02, 0.005)
 
     # second column has y-axis pointing right
-    ax[1,1].yaxis.set_label_position("right")
-    ax[1,1].yaxis.tick_right()    
-    ax[0,1].yaxis.set_label_position("right")
-    ax[0,1].yaxis.tick_right() 
+    ax[1, 1].yaxis.set_label_position("right")
+    ax[1, 1].yaxis.tick_right()
+    ax[0, 1].yaxis.set_label_position("right")
+    ax[0, 1].yaxis.tick_right()
 
     fig.legend(loc="lower center", ncols=2, bbox_to_anchor=(0.5, -0.2))
     fig.tight_layout()
