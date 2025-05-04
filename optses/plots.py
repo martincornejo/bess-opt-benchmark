@@ -160,8 +160,8 @@ def plot_benchmark(df_lp, df_nl):
 
 
 def plot_power_ecdf(res_lp, res_nl):
-    fig, ax = plt.subplots(figsize=(4.5, 2.3))
-    ax2 = fig.add_axes([0.61, 0.21, 0.25, 0.45])
+    fig, ax = plt.subplots(figsize=(4.5, 2.0))
+    ax2 = fig.add_axes([0.61, 0.235, 0.25, 0.45])
 
     codes = [Path.MOVETO] + [Path.LINETO] * 3 + [Path.CLOSEPOLY]
     vertices = [(-0.04, 0.81), (-0.04, 1.0), (1.04, 1.0), (1.04, 0.81), (0, 0)]
@@ -196,7 +196,7 @@ def plot_power_ecdf(res_lp, res_nl):
 
 ## sensitivity analysis
 def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
-    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 4.5))
+    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 4.1))
 
     r_values = sorted(df_lp["r"].unique())
 
