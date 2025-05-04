@@ -155,7 +155,7 @@ requires-dist = [
     { name = "pyomo", specifier = ">=6.8.2" },
     { name = "scipy", specifier = ">=1.15.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "simses", git = "https://github.com/martincornejo/simses-lite" },
+    { name = "simses", git = "https://github.com/martincornejo/simses-lite?rev=72181f12e50c5db681102281f5e8c7b8e35d2193" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
@@ -1574,7 +1574,7 @@ wheels = [
 [[package]]
 name = "simses"
 version = "0.1.0"
-source = { git = "https://github.com/martincornejo/simses-lite#72181f12e50c5db681102281f5e8c7b8e35d2193" }
+source = { git = "https://github.com/martincornejo/simses-lite?rev=72181f12e50c5db681102281f5e8c7b8e35d2193#72181f12e50c5db681102281f5e8c7b8e35d2193" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
