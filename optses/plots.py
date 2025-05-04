@@ -119,19 +119,19 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     bar_width = 0.35
 
     df_lp = df_lp.sort_values(by="r")
-    lp_imb_c = df_lp["imb_under"].to_numpy() * 1e-3
-    lp_imb_d = -df_lp["imb_over"].to_numpy() * 1e-3
+    lp_imb_c = df_lp["imb_ch"].to_numpy() * 1e-3
+    lp_imb_d = df_lp["imb_dch"].to_numpy() * 1e-3
     lp_total = lp_imb_c + lp_imb_d
 
     df_nl = df_nl.sort_values(by="r")
-    nl_imb_c = df_nl["imb_under"].to_numpy() * 1e-3
-    nl_imb_d = -df_nl["imb_over"].to_numpy() * 1e-3
+    nl_imb_c = df_nl["imb_ch"].to_numpy() * 1e-3
+    nl_imb_d = df_nl["imb_dch"].to_numpy() * 1e-3
     nl_total = nl_imb_c + nl_imb_d
 
-    ax.bar(x - bar_width / 2, lp_imb_c, width=bar_width, label="LP - charge", color=colors(0))
-    ax.bar(x - bar_width / 2, lp_imb_d, bottom=lp_imb_c, width=bar_width, label="LP - discharge", color=colors(1))
-    ax.bar(x + bar_width / 2, nl_imb_c, width=bar_width, label="NL - charge", color=colors(4))
-    ax.bar(x + bar_width / 2, nl_imb_d, bottom=nl_imb_c, width=bar_width, label="NL - discharge", color=colors(6))
+    ax.bar(x - bar_width / 2, lp_imb_d, width=bar_width, label="LP - discharge", color=colors(0))
+    ax.bar(x - bar_width / 2, lp_imb_c, bottom=lp_imb_d, width=bar_width, label="LP - charge", color=colors(1))
+    ax.bar(x + bar_width / 2, nl_imb_d, width=bar_width, label="NL - discharge", color=colors(4))
+    ax.bar(x + bar_width / 2, nl_imb_c, bottom=nl_imb_d, width=bar_width, label="NL - charge", color=colors(6))
 
     for i in range(len(r_values)):
         ax.text(x[i] - bar_width / 2, lp_total[i] + 0.01, f"{lp_total[i]:.0f} kWh", ha="center", va="bottom")
@@ -142,13 +142,13 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
-    ax.set_ylabel("Imbalance energy / kWh")
+    ax.set_ylabel("Energy imbalance / kWh")
     legend = ax.legend(fontsize="small", frameon=False)
     legend.set_zorder(2)
 
 
 def plot_benchmark(df_lp, df_nl):
-    fig, ax = plt.subplots(nrows=3, figsize=(4.5, 3 * 2.6))
+    fig, ax = plt.subplots(nrows=3, figsize=(4.5, 3 * 2.5))
     plot_rev_bar(ax[0], df_lp, df_nl)
     plot_eff_bar(ax[1], df_lp, df_nl)
     plot_imb_bar(ax[2], df_lp, df_nl)
@@ -160,7 +160,7 @@ def plot_benchmark(df_lp, df_nl):
 
 
 def plot_power_ecdf(res_lp, res_nl):
-    fig, ax = plt.subplots(figsize=(4.5, 2.0))
+    fig, ax = plt.subplots(figsize=(4.5, 2.2))
     ax2 = fig.add_axes([0.61, 0.235, 0.25, 0.45])
 
     codes = [Path.MOVETO] + [Path.LINETO] * 3 + [Path.CLOSEPOLY]
@@ -205,26 +205,26 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         # basis scenario
         df_lp0_ = df_lp0[df_lp0.r == r]
         rev_lp0 = df_lp0_["rev"].iloc[0]
-        imb_lp0 = df_lp0_["imb_under"] + df_lp0_["imb_over"].abs()
+        imb_lp0 = df_lp0_["imb_ch"] + df_lp0_["imb_dch"]
 
         # sensitivity
         df_lp_ = df_lp[df_lp.r == r]
         df_lp_ = df_lp_.sort_values(by="eff")
         eff = df_lp_["eff"]
-        imb_total_lp = (df_lp_["imb_under"] + df_lp_["imb_over"].abs()) / imb_lp0 - 1
+        imb_total_lp = (df_lp_["imb_ch"] + df_lp_["imb_dch"]) / imb_lp0 - 1
         rev_lp = df_lp_["rev"] / rev_lp0 - 1
 
         ## NL
         # basis scenario
         df_nl0_ = df_nl0[df_nl0.r == r]
         rev_nl0 = df_nl0_["rev"].iloc[0]
-        imb_nl0 = df_nl0_["imb_under"] + df_nl0_["imb_over"].abs()
+        imb_nl0 = df_nl0_["imb_ch"] + df_nl0_["imb_dch"]
 
         # sensitivity
         df_nl_ = df_nl[df_nl.r == r]
         df_nl_ = df_nl_.sort_values(by="r_opt")
         r_opt = df_nl_["r_opt"] - 1
-        imb_total_nl = (df_nl_["imb_under"] + df_nl_["imb_over"].abs()) / imb_nl0 - 1
+        imb_total_nl = (df_nl_["imb_ch"] + df_nl_["imb_dch"]) / imb_nl0 - 1
         rev_nl = df_nl_["rev"] / rev_nl0 - 1
 
         ax[0, 0].plot(eff, rev_lp, marker="o", color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
@@ -233,12 +233,12 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         ax[1, 1].plot(r_opt, imb_total_nl, marker="o", color=colors(6 - i))
 
     for i in range(2):
-        ax[0, i].set_ylabel(r"$\Delta$Revenue / %")
+        ax[0, i].set_ylabel(r"$\Delta$ Revenue / %")
         ax[0, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
 
     for i in range(2):
-        ax[1, i].set_ylabel(r"$\Delta E_{imb}$ / %")
+        ax[1, i].set_ylabel(r"$\Delta$ Energy imbalance / %")
         ax[1, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[1, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
 
