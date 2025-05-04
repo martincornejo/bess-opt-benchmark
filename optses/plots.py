@@ -12,9 +12,23 @@ colors = plt.cm.tab20c
 ## benchmark
 def plot_eff_rev(df_lp, df_nl):
     fig, ax = plt.subplots()
-    max_rev = 1  # max(df_lp["rev"].max(), df_nl["rev"].max())
+    max_rev = max(df_lp["rev"].max(), df_nl["rev"].max())
+    
+    # linear regression
+    rte = np.concatenate((df_lp["rte"], df_nl["rte"])) 
+    rev = np.concatenate((df_lp["rev"], df_nl["rev"])) / max_rev
+    slope, intercept = np.polyfit(rte, rev, 1)
+    r = np.corrcoef(rte, rev)[0,1]
+    print(f"{slope=:.2f}")
+    print(f"{r=:.3f}")
+
+    ax.axline((0, intercept), slope=slope, color="gray", alpha=0.5, linestyle="--")
+
     ax.scatter(df_lp["rte"], df_lp["rev"] / max_rev, label="LP")
     ax.scatter(df_nl["rte"], df_nl["rev"] / max_rev, label="NL")
+
+    ax.set_ylim(0.87, 1.01)
+    ax.set_xlim(0.83, 0.93)
     ax.legend()
     return fig
 
