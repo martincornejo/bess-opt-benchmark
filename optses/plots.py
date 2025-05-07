@@ -196,7 +196,7 @@ def plot_power_ecdf(res_lp, res_nl):
 
 ## sensitivity analysis
 def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
-    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 4.1))
+    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.8))
 
     r_values = sorted(df_lp["r"].unique())
 
@@ -244,8 +244,8 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
 
     ax[0, 0].set_xlabel(r"$\eta$ / %")
     ax[1, 0].set_xlabel(r"$\eta$ / %")
-    ax[0, 1].set_xlabel(r"$\Delta SOH_R$ / %")
-    ax[1, 1].set_xlabel(r"$\Delta SOH_R$ / %")
+    ax[0, 1].set_xlabel(r"$\Delta R$ / %")
+    ax[1, 1].set_xlabel(r"$\Delta R$ / %")
 
     ax[0, 0].set_ylim(-0.02, 0.005)
     ax[0, 1].set_ylim(-0.02, 0.005)
