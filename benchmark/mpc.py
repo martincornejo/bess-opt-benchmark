@@ -232,7 +232,6 @@ def run_mpc(
     err_count = 0
 
     # MPC loop
-    t_opt_reset = pd.date_range(start=start_dt, end=end_dt, freq=timedelta(weeks=2))
     timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
     for t in tqdm(timesteps, desc=name, **tqdm_options):
         # optses - solve optimal schedule
