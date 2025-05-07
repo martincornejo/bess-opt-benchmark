@@ -235,11 +235,6 @@ def run_mpc(
     t_opt_reset = pd.date_range(start=start_dt, end=end_dt, freq=timedelta(weeks=2))
     timesteps = pd.date_range(start=start_dt, end=(end_dt - horizon), freq=(timestep_dt * steps))
     for t in tqdm(timesteps, desc=name, **tqdm_options):
-        if t in t_opt_reset:
-            # re-instantiate the optimizer every month of simulation
-            # this is due to a bug in pyomo
-            optimizer = optimizer_factory(profile=profile.loc[start_dt : (start_dt + horizon)], **opt_params)
-
         # optses - solve optimal schedule
         timerange = pd.date_range(start=t, end=t + horizon, freq=timestep_dt)
         params = {
