@@ -40,4 +40,8 @@ python benchmark/run.py
 All scenarios are run in parallel, which significantly speeds up the simulation process. The original simulations were executed on an Intel Xeon W-2295 processor with 18 cores (36 threads).
 Please note that using processors with fewer parallelization capabilities may result in longer simulation times. For optimal performance, it is recommended to run the simulations on a multi-core processor.
 
+The version of pyomo used in this study has known issues on Windows (https://github.com/Pyomo/pyomo/issues/3587). 
+Therefore, it is recommended to run the simulations in Linux environment. 
+If you are using Windows, it is advisable to utilize WSL.
+
 After running the simulations, you can analyze the results using the `analysis.ipynb` notebook.
