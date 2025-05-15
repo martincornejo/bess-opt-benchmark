@@ -142,7 +142,7 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
-    ax.set_ylabel("Energy imbalance / kWh")
+    ax.set_ylabel("Energy shortfall / kWh")
     legend = ax.legend(fontsize="small", frameon=False)
     legend.set_zorder(2)
 
@@ -196,7 +196,7 @@ def plot_power_ecdf(res_lp, res_nl):
 
 ## sensitivity analysis
 def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
-    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.8))
+    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.7))
 
     r_values = sorted(df_lp["r"].unique())
 
@@ -238,7 +238,7 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
 
     for i in range(2):
-        ax[1, i].set_ylabel(r"$\Delta$ Energy imbalance / %")
+        ax[1, i].set_ylabel(r"$\Delta$ Energy shorfall / %")
         ax[1, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[1, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
 
