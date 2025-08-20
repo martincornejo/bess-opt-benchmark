@@ -196,7 +196,7 @@ def plot_power_ecdf(res_lp, res_nl):
 
 ## sensitivity analysis
 def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
-    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.7))
+    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.5))
 
     r_values = sorted(df_lp["r"].unique())
 
@@ -227,28 +227,33 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         imb_total_nl = (df_nl_["imb_ch"] + df_nl_["imb_dch"]) / imb_nl0 - 1
         rev_nl = df_nl_["rev"] / rev_nl0 - 1
 
-        ax[0, 0].plot(eff, rev_lp, marker="o", color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
-        ax[0, 1].plot(r_opt, rev_nl, marker="o", color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
-        ax[1, 0].plot(eff, imb_total_lp, marker="o", color=colors(2 - i))
-        ax[1, 1].plot(r_opt, imb_total_nl, marker="o", color=colors(6 - i))
+        ax[0, 0].plot(eff, rev_lp, marker="o", markersize=4.5, color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
+        ax[0, 1].plot(r_opt, rev_nl, marker="o", markersize=4.5, color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
+        ax[1, 0].plot(eff, imb_total_lp, marker="o", markersize=4.5, color=colors(2 - i))
+        ax[1, 1].plot(r_opt, imb_total_nl, marker="o", markersize=4.5, color=colors(6 - i))
 
     for i in range(2):
-        ax[0, i].set_ylabel(r"$\Delta$ Revenue / %")
+        ax[0, i].set_ylabel(r"$\Delta$ Revenue / %", fontsize=9.5)
         ax[0, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
 
     for i in range(2):
-        ax[1, i].set_ylabel(r"$\Delta$ Energy shorfall / %")
+        ax[1, i].set_ylabel(r"$\Delta$ Energy shorfall / %", fontsize=9.5)
         ax[1, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
         ax[1, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
 
-    ax[0, 0].set_xlabel(r"$\eta$ / %")
-    ax[1, 0].set_xlabel(r"$\eta$ / %")
-    ax[0, 1].set_xlabel(r"$\Delta R$ / %")
-    ax[1, 1].set_xlabel(r"$\Delta R$ / %")
+    ax[0, 0].set_xlabel(r"$\eta$ / %", fontsize=9.5)
+    ax[1, 0].set_xlabel(r"$\eta$ / %", fontsize=9.5)
+    ax[0, 1].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
+    ax[1, 1].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
 
     ax[0, 0].set_ylim(-0.02, 0.005)
     ax[0, 1].set_ylim(-0.02, 0.005)
+
+    # Reduce tick label size for all axes
+    for i in range(2):
+        for j in range(2):
+            ax[i, j].tick_params(axis="both", labelsize=10)
 
     # second column has y-axis pointing right
     ax[1, 1].yaxis.set_label_position("right")
@@ -256,7 +261,7 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
     ax[0, 1].yaxis.set_label_position("right")
     ax[0, 1].yaxis.tick_right()
 
-    fig.legend(loc="lower center", ncols=2, bbox_to_anchor=(0.5, -0.2))
+    fig.legend(loc="lower center", ncols=2, bbox_to_anchor=(0.5, -0.2), fontsize=9)
     fig.tight_layout()
 
     ax[0, 0].set_title("a)", fontweight="bold", loc="left")
