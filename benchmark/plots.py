@@ -56,7 +56,7 @@ def plot_rev_bar(ax, df_lp, df_nl) -> None:
             f"{improvement:+.1%}",
             xy=(x[i] - bar_width / 2, lp_rev[i]),
             xytext=(x[i] + bar_width / 2, nl_rev[i]),
-            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.3 - i * 0.25}", color="black"),
+            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.3 - i * 0.3}", color="black"),
             ha="center",
             va="bottom",
         )
@@ -95,8 +95,8 @@ def plot_eff_bar(ax, df_lp, df_nl) -> None:
         ax.annotate(
             f"{improvement:+.1%}",
             xy=(x[i] - bar_width / 2, lp_loss_total[i]),
-            xytext=(x[i] + bar_width / 2, nl_loss_total[i]),
-            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.5 + i * 0.1}", color="black"),
+            xytext=(x[i] + bar_width / 2 + bar_width / 5, nl_loss_total[i]),
+            arrowprops=dict(arrowstyle="<|-", connectionstyle=f"bar,angle=0,fraction={0.6 + i * 0.05}", color="black"),
             ha="center",
             va="bottom",
         )
@@ -119,13 +119,13 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     bar_width = 0.35
 
     df_lp = df_lp.sort_values(by="r")
-    lp_imb_c = df_lp["imb_ch"].to_numpy() * 1e-3
-    lp_imb_d = df_lp["imb_dch"].to_numpy() * 1e-3
+    lp_imb_c = df_lp["imb_ch"].to_numpy() * 1e-6
+    lp_imb_d = df_lp["imb_dch"].to_numpy() * 1e-6
     lp_total = lp_imb_c + lp_imb_d
 
     df_nl = df_nl.sort_values(by="r")
-    nl_imb_c = df_nl["imb_ch"].to_numpy() * 1e-3
-    nl_imb_d = df_nl["imb_dch"].to_numpy() * 1e-3
+    nl_imb_c = df_nl["imb_ch"].to_numpy() * 1e-6
+    nl_imb_d = df_nl["imb_dch"].to_numpy() * 1e-6
     nl_total = nl_imb_c + nl_imb_d
 
     ax.bar(x - bar_width / 2, lp_imb_d, width=bar_width, label="LP - discharge", color=colors(0))
@@ -134,28 +134,28 @@ def plot_imb_bar(ax, df_lp, df_nl) -> None:
     ax.bar(x + bar_width / 2, nl_imb_c, bottom=nl_imb_d, width=bar_width, label="NL - charge", color=colors(6))
 
     for i in range(len(r_values)):
-        ax.text(x[i] - bar_width / 2, lp_total[i] + 0.01, f"{lp_total[i]:.0f} kWh", ha="center", va="bottom")
-        ax.text(x[i] + bar_width / 2 + 0.08, nl_total[i] + 0.01, f"{nl_total[i]:.0f} kWh", ha="center", va="bottom")
+        ax.text(x[i] - bar_width / 2 + bar_width / 5, lp_total[i] + 0.01, f"{lp_total[i]*1e3:.0f} kWh", ha="center", va="bottom", fontsize="small")
+        ax.text(x[i] + bar_width / 2 + bar_width / 5, nl_total[i] + 0.01, f"{nl_total[i]*1e3:.0f} kWh", ha="center", va="bottom", fontsize="small")
 
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:,.0f}"))
-    ax.set_ylim(0, 14000)
+    ax.set_ylim(0, 14)
     ax.set_xticks(x)
     ax.set_xticklabels(r_values)
     ax.set_xlabel("$SOH_R$")
-    ax.set_ylabel("Energy shortfall / kWh")
+    ax.set_ylabel("Energy shortfall / MWh")
     legend = ax.legend(fontsize="small", frameon=False)
     legend.set_zorder(2)
 
 
 def plot_benchmark(df_lp, df_nl):
-    fig, ax = plt.subplots(nrows=3, figsize=(4.5, 3 * 2.5))
+    fig, ax = plt.subplots(ncols=3, figsize=(3 * 3.8, 3.8))
     plot_rev_bar(ax[0], df_lp, df_nl)
     plot_eff_bar(ax[1], df_lp, df_nl)
     plot_imb_bar(ax[2], df_lp, df_nl)
     fig.tight_layout()
-    ax[0].set_title("a)", fontweight="bold", loc="left")
-    ax[1].set_title("b)", fontweight="bold", loc="left")
-    ax[2].set_title("c)", fontweight="bold", loc="left")
+    ax[0].set_title("Economic performance", fontweight="bold")
+    ax[1].set_title("System efficiency", fontweight="bold")
+    ax[2].set_title("Schedule feasability", fontweight="bold")
     return fig
 
 
@@ -196,24 +196,11 @@ def plot_power_ecdf(res_lp, res_nl):
 
 ## sensitivity analysis
 def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
-    fig, ax = plt.subplots(ncols=2, nrows=2, figsize=(4.5, 3.5))
+    fig, ax = plt.subplots(ncols=2, figsize=(6, 3))
 
     r_values = sorted(df_lp["r"].unique())
 
     for i, r in enumerate(r_values):
-        ## LP
-        # basis scenario
-        df_lp0_ = df_lp0[df_lp0.r == r]
-        rev_lp0 = df_lp0_["rev"].iloc[0]
-        imb_lp0 = df_lp0_["imb_ch"] + df_lp0_["imb_dch"]
-
-        # sensitivity
-        df_lp_ = df_lp[df_lp.r == r]
-        df_lp_ = df_lp_.sort_values(by="eff")
-        eff = df_lp_["eff"]
-        imb_total_lp = (df_lp_["imb_ch"] + df_lp_["imb_dch"]) / imb_lp0 - 1
-        rev_lp = df_lp_["rev"] / rev_lp0 - 1
-
         ## NL
         # basis scenario
         df_nl0_ = df_nl0[df_nl0.r == r]
@@ -227,47 +214,37 @@ def plot_sensitivity(df_lp, df_nl, df_lp0, df_nl0):
         imb_total_nl = (df_nl_["imb_ch"] + df_nl_["imb_dch"]) / imb_nl0 - 1
         rev_nl = df_nl_["rev"] / rev_nl0 - 1
 
-        ax[0, 0].plot(eff, rev_lp, marker="o", markersize=4.5, color=colors(2 - i), label=rf"LP - $SOH_R = {float(i + 1)}$")
-        ax[0, 1].plot(r_opt, rev_nl, marker="o", markersize=4.5, color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
-        ax[1, 0].plot(eff, imb_total_lp, marker="o", markersize=4.5, color=colors(2 - i))
-        ax[1, 1].plot(r_opt, imb_total_nl, marker="o", markersize=4.5, color=colors(6 - i))
+        ax[0].plot(r_opt, rev_nl, marker="o", markersize=4.5, color=colors(6 - i))
+        ax[1].plot(r_opt, imb_total_nl, marker="o", markersize=4.5, color=colors(6 - i), label=rf"NL - $SOH_R = {float(i + 1)}$")
 
-    for i in range(2):
-        ax[0, i].set_ylabel(r"$\Delta$ Revenue / %", fontsize=9.5)
-        ax[0, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
-        ax[0, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+        ax[0].set_ylabel(r"$\Delta$ Revenue / %", fontsize=9.5)
+        ax[0].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+        ax[0].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
 
-    for i in range(2):
-        ax[1, i].set_ylabel(r"$\Delta$ Energy shorfall / %", fontsize=9.5)
-        ax[1, i].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
-        ax[1, i].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
+        ax[1].set_ylabel(r"$\Delta$ Energy shorfall / %", fontsize=9.5)
+        ax[1].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:.1f}"))
+        ax[1].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x * 100:,.0f}"))
 
-    ax[0, 0].set_xlabel(r"$\eta$ / %", fontsize=9.5)
-    ax[1, 0].set_xlabel(r"$\eta$ / %", fontsize=9.5)
-    ax[0, 1].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
-    ax[1, 1].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
+    ax[0].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
+    ax[1].set_xlabel(r"$\Delta R$ / %", fontsize=9.5)
 
-    ax[0, 0].set_ylim(-0.02, 0.005)
-    ax[0, 1].set_ylim(-0.02, 0.005)
+    ax[0].set_ylim(-0.02, 0.005)
 
     # Reduce tick label size for all axes
     for i in range(2):
-        for j in range(2):
-            ax[i, j].tick_params(axis="both", labelsize=10)
+        ax[i].tick_params(axis="both", labelsize=10)
 
     # second column has y-axis pointing right
-    ax[1, 1].yaxis.set_label_position("right")
-    ax[1, 1].yaxis.tick_right()
-    ax[0, 1].yaxis.set_label_position("right")
-    ax[0, 1].yaxis.tick_right()
+    # ax[1, 1].yaxis.set_label_position("right")
+    # ax[1, 1].yaxis.tick_right()
+    # ax[0, 1].yaxis.set_label_position("right")
+    # ax[0, 1].yaxis.tick_right()
 
-    fig.legend(loc="lower center", ncols=2, bbox_to_anchor=(0.5, -0.2), fontsize=9)
+    ax[1].legend(loc="upper right", fontsize="small", frameon=False)
+
+    ax[0].set_title("Economic performance loss", fontweight="bold", fontsize=10)
+    ax[1].set_title("Schedule feasability loss", fontweight="bold", fontsize=10)
     fig.tight_layout()
-
-    ax[0, 0].set_title("a)", fontweight="bold", loc="left")
-    ax[0, 1].set_title("b)", fontweight="bold", loc="left")
-    ax[1, 0].set_title("c)", fontweight="bold", loc="left")
-    ax[1, 1].set_title("d)", fontweight="bold", loc="left")
     return fig
 
 
