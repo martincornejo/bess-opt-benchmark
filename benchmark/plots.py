@@ -154,8 +154,8 @@ def plot_benchmark(df_lp, df_nl):
     plot_imb_bar(ax[2], df_lp, df_nl)
     fig.tight_layout()
     ax[0].set_title("Economic performance", fontweight="bold")
-    ax[1].set_title("System efficiency", fontweight="bold")
-    ax[2].set_title("Schedule feasability", fontweight="bold")
+    ax[1].set_title("System losses", fontweight="bold")
+    ax[2].set_title("Schedule infeasability", fontweight="bold")
     return fig
 
 
