@@ -2,6 +2,8 @@
 
 This repository contains the code that accompanies the paper "Evaluating the Impact of Model Accuracy for Optimizing Battery Energy Storage Systems".
 
+Paper preprint: [https://arxiv.org/abs/2506.17059](https://arxiv.org/abs/2506.17059)
+
 ## Table of Contents
 - [Project Structure](#project-structure)
 - [Setup Instructions](#setup-instructions)
@@ -45,3 +47,17 @@ Therefore, it is recommended to run the simulations in Linux environment.
 If you are using Windows, it is advisable to utilize WSL.
 
 After running the simulations, you can analyze the results using the `analysis.ipynb` notebook.
+
+## Cite
+
+```
+@misc{cornejo_evaluating_2025,
+	title = {Evaluating the {Impact} of {Model} {Accuracy} for {Optimizing} {Battery} {Energy} {Storage} {Systems}},
+	doi = {10.48550/arXiv.2506.17059},
+	publisher = {arXiv},
+	author = {Cornejo, Martin and Graner, Melina and Hesse, Holger and Jossen, Andreas},
+	month = jun,
+	year = {2025},
+	keywords = {Electrical Engineering and Systems Science - Systems and Control,
+}
+```
