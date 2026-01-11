@@ -51,13 +51,14 @@ After running the simulations, you can analyze the results using the `analysis.i
 ## Cite
 
 ```
-@misc{cornejo_evaluating_2025,
+@inproceedings{cornejo_evaluating_2025,
 	title = {Evaluating the {Impact} of {Model} {Accuracy} for {Optimizing} {Battery} {Energy} {Storage} {Systems}},
-	doi = {10.48550/arXiv.2506.17059},
-	publisher = {arXiv},
+	url = {https://ieeexplore.ieee.org/document/11305340},
+	doi = {10.1109/ISGTEurope64741.2025.11305340},
+	booktitle = {2025 {IEEE} {PES} {Innovative} {Smart} {Grid} {Technologies} {Conference} {Europe} ({ISGT} {Europe})},
 	author = {Cornejo, Martin and Graner, Melina and Hesse, Holger and Jossen, Andreas},
-	month = jun,
+	month = oct,
 	year = {2025},
-	keywords = {Electrical Engineering and Systems Science - Systems and Control,
+	pages = {1--5},
 }
 ```
